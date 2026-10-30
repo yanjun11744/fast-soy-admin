@@ -145,6 +145,7 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
     ns = snake_to_pascal(module) + "Manage"
     lines = [
         "import { request } from '../request';",
+        "import type { ExcelDownload } from '@/utils/excel';",
         "",
     ]
     for model in models:
@@ -201,6 +202,20 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
             "  });",
             "}",
             "",
+            "",
+            f"export function fetchExport{entity}(data?: Api.{ns}.{entity}SearchParams) {{",
+            f"  return request<ExcelDownload>({{ url: '{url_base}/export', method: 'post', data: data ?? {{}} }});",
+            "}",
+            "",
+            f"export function fetch{entity}ImportTemplate() {{",
+            f"  return request<ExcelDownload>({{ url: '{url_base}/import-template' }});",
+            "}",
+            "",
+            f"export function fetchImport{entity}(file: File) {{",
+            "  const data = new FormData();",
+            "  data.append('file', file);",
+            f"  return request<{{ importedCount: number }}>({{ url: '{url_base}/import', method: 'post', data, headers: {{ 'Content-Type': 'multipart/form-data' }}, timeout: 120000 }});",
+            "}",
             "",
             f"void {entity_snake};",  # placeholder to avoid unused var warning; removed below
         ])
@@ -579,10 +594,13 @@ def gen_view_index(
           @refresh="getData"
         />"""
 
+    excel_auth = f":can-import=\"hasAuth('{_button_code(module, model, 'IMPORT')}')\" :can-export=\"hasAuth('{_button_code(module, model, 'EXPORT')}')\"" if button_auth else ""
+
     template = f"""<script setup lang="tsx">
 import {{ {", ".join(vue_imports)} }} from 'vue';
 import {{ NButton, NPopconfirm }} from 'naive-ui';
-import {{ fetchBatchDelete{entity}, fetchDelete{entity}, fetchGet{entity}List }} from '@/service/api';
+import ExcelTransfer from '@/components/advanced/excel-transfer.vue';
+import {{ fetchBatchDelete{entity}, fetchDelete{entity}, fetchGet{entity}List, fetchExport{entity}, fetchImport{entity}, fetch{entity}ImportTemplate }} from '@/service/api';
 import {{ useAppStore }} from '@/store/modules/app';
 import {{ defaultTransform, useNaivePaginatedTable, useTableOperate }} from '@/hooks/common/table';
 {chr(10).join(button_auth_lines)}
@@ -655,7 +673,16 @@ function edit(id: string) {{
 {search_component}
     <NCard :title="$t('{i18n_page}.pageTitle')" :bordered="false" size="small" class="card-wrapper sm:flex-1-hidden">
       <template #header-extra>
+        <NSpace align="center" wrap>
+          <ExcelTransfer
+            :import-api="fetchImport{entity}"
+            :export-api="() => fetchExport{entity}(searchParams)"
+            :template-api="fetch{entity}ImportTemplate"
+            {excel_auth}
+            @imported="getDataByPage(1)"
+          />
 {header_operation}
+        </NSpace>
       </template>
       <NDataTable
         v-model:checked-row-keys="checkedRowKeys"

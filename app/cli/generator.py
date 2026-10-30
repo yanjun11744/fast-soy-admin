@@ -237,6 +237,9 @@ def _button_action_dependencies(module_name: str, model: ModelInfo) -> list[str]
         f'        "update": [require_buttons("{_button_code(module_name, model, "EDIT")}")],',
         f'        "delete": [require_buttons("{_button_code(module_name, model, "DELETE")}")],',
         f'        "batch_delete": [require_buttons("{_button_code(module_name, model, "DELETE")}")],',
+        f'        "import": [require_buttons("{_button_code(module_name, model, "IMPORT")}")],',
+        f'        "import_template": [require_buttons("{_button_code(module_name, model, "IMPORT")}")],',
+        f'        "export": [require_buttons("{_button_code(module_name, model, "EXPORT")}")],',
         "    },",
     ]
 
@@ -349,7 +352,7 @@ def gen_api_manage(
     if needs_request:
         fastapi_imports.append("Request")
 
-    utils_imports = ["CRUDRouter"]
+    utils_imports = ["CRUDRouter", "ExcelConfig"]
     if needs_search_config:
         utils_imports.append("SearchFieldConfig")
     if needs_request:
@@ -401,10 +404,33 @@ def gen_api_manage(
 
         search_parts = _search_config_parts(contains, exact)
 
+        scope = backend_options.data_scope.get(m.name)
+        if scope:
+            lines.extend([
+                f"async def _{m.snake_name}_excel_scope(request: Request):",
+                "    scope = await get_current_data_scope(request.app.state.redis)",
+                "    return build_scope_filter(",
+                "        scope=scope,",
+                "        user_id=CTX_USER_ID.get(),",
+                "        scope_id=_get_scope_id(),",
+                f'        user_id_field="{scope.user_id_field}",',
+                f'        scope_id_field="{scope.scope_id_field}",',
+                "    )",
+                "",
+            ])
+
         lines.append(f"{m.snake_name}_crud = CRUDRouter(")
         lines.append(f'    prefix="/{m.plural_snake}",')
         lines.append(f"    controller={m.snake_name}_controller,")
         lines.append(f"    create_schema={m.name}Create,")
+        excluded = set(backend_options.exclude_fields.get(m.name, []))
+        excel_fields = [f.name for f in m.schema_fields if f.name not in excluded]
+        excel_fields.extend(f"{r.name}_id" for r in m.relations if r.relation_type in ("ForeignKeyField", "OneToOneField") and f"{r.name}_id" not in excluded)
+        if excel_fields:
+            lines.append(f"    excel=ExcelConfig(fields={tuple(excel_fields)!r}),")
+            if scope:
+                lines.append(f"    excel_scope_filter=_{m.snake_name}_excel_scope,")
+
         lines.append(f"    update_schema={m.name}Update,")
         lines.append(f"    list_schema={m.name}Search,")
         lines.append(f'    route_key_prefix="{module_name}.{m.plural_snake}",')
@@ -480,6 +506,8 @@ def _model_button_defs(module_name: str, model: ModelInfo) -> list[dict[str, str
         {"button_code": _button_code(module_name, model, "CREATE"), "button_desc": f"创建{model.cn_name}"},
         {"button_code": _button_code(module_name, model, "EDIT"), "button_desc": f"编辑{model.cn_name}"},
         {"button_code": _button_code(module_name, model, "DELETE"), "button_desc": f"删除{model.cn_name}"},
+        {"button_code": _button_code(module_name, model, "IMPORT"), "button_desc": f"导入{model.cn_name}"},
+        {"button_code": _button_code(module_name, model, "EXPORT"), "button_desc": f"导出{model.cn_name}"},
     ]
 
 

@@ -335,6 +335,11 @@ declare namespace App {
         updateCancel: string;
       };
       common: {
+        excelImport: string;
+        excelExport: string;
+        excelTemplate: string;
+        excelFileLimit: string;
+        excelImportSuccess: string;
         action: string;
         add: string;
         addSuccess: string;
