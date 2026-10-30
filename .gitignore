@@ -52,7 +52,7 @@ web/.pnpm-store/
 !.vscode/settings.json
 !.vscode/launch.json
 .DS_Store
-._.DS_Store
+._*
 *.suo
 *.ntvs*
 *.njsproj
