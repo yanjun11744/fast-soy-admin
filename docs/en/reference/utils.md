@@ -24,6 +24,7 @@ from app.utils import (
     # CRUD
     CRUDBase, get_db_conn,
     CRUDRouter, SearchFieldConfig,
+    ExcelConfig, ExcelColumn,
 
     # Business code & exceptions
     Code, BizError, SchemaValidationError,
