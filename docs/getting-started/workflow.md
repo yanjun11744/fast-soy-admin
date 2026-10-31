@@ -86,7 +86,7 @@ class Product(BaseModel, AuditMixin):
 just cli-gen inventory
 ```
 
-CLI 会先让你选择本次要生成 CRUD 的模型（可输入序号或类名，回车全选），再分别选择每个模型的**模糊查询字段**和**精确查询字段**。生成：
+CLI 会先让你选择本次要生成 CRUD 的模型（可输入序号或类名，回车全选），再分别选择每个模型的**模糊/范围查询字段**和**精确查询字段**。`DateField` / `DatetimeField` 默认按起止日期／时间段查询，生成前端范围选择器和后端 `range_fields`；普通文本字段仍使用模糊匹配。生成：
 
 ```
 app/business/inventory/
