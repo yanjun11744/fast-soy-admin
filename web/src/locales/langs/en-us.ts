@@ -7,6 +7,19 @@ const local: App.I18n.BaseSchema = {
     updateCancel: 'Later'
   },
   common: {
+    excelPreview: 'Import preview',
+    excelExactMatch:
+      'Headers must exactly match a configured name or alias, including case, spaces and character width. Map or explicitly ignore unknown columns, then validate again.',
+    excelSheet: 'Worksheet',
+    excelHeaderRow: 'Header row (1–100, blank for auto detection)',
+    excelValidate: 'Detect and validate',
+    excelSourceColumn: 'Source column',
+    excelTargetField: 'Target field',
+    excelSamples: 'Samples (first 3 rows)',
+    excelSelectField: 'Select a field or ignore',
+    excelIgnoreColumn: 'Ignore this column',
+    excelRowCount: '{count} non-empty rows; up to 20 validation errors shown',
+    excelConfirmImport: 'Confirm import',
     excelImport: 'Import Excel',
     excelExport: 'Export Excel',
     excelTemplate: 'Download import template',

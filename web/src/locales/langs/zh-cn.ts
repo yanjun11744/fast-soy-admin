@@ -7,6 +7,19 @@ const local: App.I18n.BaseSchema = {
     updateCancel: '稍后再说'
   },
   common: {
+    excelPreview: '导入预览',
+    excelExactMatch:
+      '表头与配置的名称或别名必须完全一致，区分大小写、空格和全半角。未识别列需手动映射或明确忽略；调整后请重新校验。',
+    excelSheet: '工作表',
+    excelHeaderRow: '表头行（1–100，留空自动识别）',
+    excelValidate: '识别并校验',
+    excelSourceColumn: '原始列',
+    excelTargetField: '目标字段',
+    excelSamples: '样例（前 3 行）',
+    excelSelectField: '请选择字段或忽略',
+    excelIgnoreColumn: '忽略此列',
+    excelRowCount: '共 {count} 条非空数据，最多显示 20 条校验错误',
+    excelConfirmImport: '确认导入',
     excelImport: '导入 Excel',
     excelExport: '导出 Excel',
     excelTemplate: '下载导入模板',

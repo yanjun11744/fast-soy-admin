@@ -230,3 +230,44 @@ The module's `api/__init__.py` must export `router: APIRouter` for autodiscover 
 - [API conventions](/en/develop/api)
 - [Schema base](/en/develop/schema)
 - [Auth](/en/develop/auth) — `require_buttons` / `require_roles`
+
+## Excel titles, exact aliases and import preview
+
+Enable Excel for simple resources with `excel=ExcelConfig(fields=("name", "phone"))`. Templates and exports use `ExcelColumn.title`, then the create Schema's `Field(title=...)`, then the field name. Original field names remain accepted on import.
+
+```python
+from app.utils import ExcelColumn, ExcelConfig
+
+excel = ExcelConfig(
+    fields=("name", "phone"),
+    columns={
+        "name": ExcelColumn(aliases=("Customer Name",)),
+        "phone": ExcelColumn(title="Phone number", aliases=("Mobile", "联系电话")),
+    },
+)
+```
+
+Headers match field names, Schema aliases/titles, Excel titles and explicit aliases literally. Case, spaces, line breaks and full-width characters are significant; no fuzzy matching or normalization is performed. Conflicting labels across fields fail at router initialization. Excel aliases do not change JSON API aliases.
+
+| Endpoint | Behavior |
+| --- | --- |
+| `GET /customers/import-template` | Download the template |
+| `POST /customers/import-preview` | Detect columns and validate the sheet without database writes |
+| `POST /customers/import` | Revalidate the file and create records in one transaction |
+| `POST /customers/export` | Export matching records with list filters and configured data scope |
+
+Preview and import accept multipart `file` and an optional JSON string named `options`:
+
+```json
+{"sheet":"Customers","headerRow":3,"columns":["name","phone",null]}
+```
+
+`sheet` is required for workbooks with multiple sheets. `headerRow` is a 1-based row number within the first 100 rows; omit it to detect a unique candidate based on exact required-field matches and total field matches. `columns` maps each source column to a whitelisted internal field name, with `null` explicitly ignoring a column. Unknown columns otherwise block import, as do duplicate target fields or missing required fields.
+
+The preview includes sheet names, selected header row, target fields, the first three samples per column (up to 120 characters per sample), nonempty row count and up to 20 errors. Generated pages connect `ExcelTransfer.previewApi` automatically. Existing pages need a preview service and the `preview-api` prop; without it they retain direct import. Any selection or mapping change requires revalidation before confirmation. Confirmation uploads and parses the file again; no temporary upload storage is used.
+
+Only `.xlsx` is supported: 5MB compressed, 50MB uncompressed, at most 200 columns and 10,000 row positions after the selected header. Formula cells are rejected, including ignored columns. Blank cells are treated as missing. Dates, JSON, enums and Sqid foreign keys keep their existing formats; dictionary translation, name-to-ID resolution, `.xls`, CSV and multi-level headers are not included.
+
+The preview validates the Schema without invoking `controller.create`; database constraints and business creation failures can still occur during confirmation and roll back the whole import. Errors refer to physical worksheet row numbers without echoing invalid cell values. Complex creation flows should override `import` and use their business service.
+
+Import defaults to the create action dependencies; preview and template default to the import action dependencies; export defaults to list. The new preview API still needs API permission grants for ordinary roles. No role seeds or existing grants are changed. Export keeps configured list filters, `data_policy` and `excel_scope_filter`; custom list overrides must apply equivalent export constraints.

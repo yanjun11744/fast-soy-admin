@@ -145,7 +145,8 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
     ns = snake_to_pascal(module) + "Manage"
     lines = [
         "import { request } from '../request';",
-        "import type { ExcelDownload } from '@/utils/excel';",
+        "import { createExcelFormData } from '@/utils/excel';",
+        "import type { ExcelDownload, ExcelImportOptions, ExcelPreview } from '@/utils/excel';",
         "",
     ]
     for model in models:
@@ -211,9 +212,13 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
             f"  return request<ExcelDownload>({{ url: '{url_base}/import-template' }});",
             "}",
             "",
-            f"export function fetchImport{entity}(file: File) {{",
-            "  const data = new FormData();",
-            "  data.append('file', file);",
+            f"export function fetchPreviewImport{entity}(file: File, options?: ExcelImportOptions) {{",
+            "  const data = createExcelFormData(file, options);",
+            f"  return request<ExcelPreview>({{ url: '{url_base}/import-preview', method: 'post', data, headers: {{ 'Content-Type': 'multipart/form-data' }}, timeout: 120000 }});",
+            "}",
+            "",
+            f"export function fetchImport{entity}(file: File, options?: ExcelImportOptions) {{",
+            "  const data = createExcelFormData(file, options);",
             f"  return request<{{ importedCount: number }}>({{ url: '{url_base}/import', method: 'post', data, headers: {{ 'Content-Type': 'multipart/form-data' }}, timeout: 120000 }});",
             "}",
             "",
@@ -600,7 +605,10 @@ def gen_view_index(
 import {{ {", ".join(vue_imports)} }} from 'vue';
 import {{ NButton, NPopconfirm }} from 'naive-ui';
 import ExcelTransfer from '@/components/advanced/excel-transfer.vue';
-import {{ fetchBatchDelete{entity}, fetchDelete{entity}, fetchGet{entity}List, fetchExport{entity}, fetchImport{entity}, fetch{entity}ImportTemplate }} from '@/service/api';
+import {{
+  fetchBatchDelete{entity}, fetchDelete{entity}, fetchGet{entity}List,
+  fetchExport{entity}, fetchImport{entity}, fetchPreviewImport{entity}, fetch{entity}ImportTemplate
+}} from '@/service/api';
 import {{ useAppStore }} from '@/store/modules/app';
 import {{ defaultTransform, useNaivePaginatedTable, useTableOperate }} from '@/hooks/common/table';
 {chr(10).join(button_auth_lines)}
@@ -676,6 +684,7 @@ function edit(id: string) {{
         <NSpace align="center" wrap>
           <ExcelTransfer
             :import-api="fetchImport{entity}"
+            :preview-api="fetchPreviewImport{entity}"
             :export-api="() => fetchExport{entity}(searchParams)"
             :template-api="fetch{entity}ImportTemplate"
             {excel_auth}

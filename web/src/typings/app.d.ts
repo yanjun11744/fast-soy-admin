@@ -335,6 +335,18 @@ declare namespace App {
         updateCancel: string;
       };
       common: {
+        excelPreview: string;
+        excelExactMatch: string;
+        excelSheet: string;
+        excelHeaderRow: string;
+        excelValidate: string;
+        excelSourceColumn: string;
+        excelTargetField: string;
+        excelSamples: string;
+        excelSelectField: string;
+        excelIgnoreColumn: string;
+        excelRowCount: string;
+        excelConfirmImport: string;
         excelImport: string;
         excelExport: string;
         excelTemplate: string;

@@ -3,9 +3,9 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import APIRouter, Request, UploadFile
+from fastapi import APIRouter, Form, Request, UploadFile
 from fastapi.routing import APIRoute
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 from tortoise.exceptions import IntegrityError
 from tortoise.transactions import in_transaction
@@ -13,7 +13,7 @@ from tortoise.transactions import in_transaction
 from app.core.base_schema import CommonIds, Success, SuccessExtra
 from app.core.code import Code
 from app.core.crud import CRUDBase, get_db_conn
-from app.core.excel import MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, read_excel, write_excel
+from app.core.excel import MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, ExcelImportOptions, ExcelImportResult, parse_excel, write_excel
 from app.core.exceptions import BizError
 from app.core.sqids import encode_id
 from app.core.types import SqidPath
@@ -251,6 +251,7 @@ class CRUDRouter:
             "batch_delete": "async def batch_delete(obj_in: CommonIds)",
             "import": "async def import_excel(file: UploadFile)",
             "import_template": "async def download_template()",
+            "import_preview": "async def preview_import(file: UploadFile, options: str | None)",
             "export": f"async def export_excel(obj_in: {self.list_schema.__name__}, request: Request)" if self.list_schema else "",
         }
         spec["signature"] = signatures.get(name, "")
@@ -454,37 +455,51 @@ class CRUDRouter:
             raise ValueError("Excel fields must be nonempty create_schema field names")
         if set(config.fields) & set(self.exclude_fields):
             raise ValueError("Excel fields cannot include excluded fields")
-        for action, fallback in (("import", "create"), ("import_template", "create"), ("export", "list")):
+        for action, fallback in (("import", "create"), ("import_template", "import"), ("import_preview", "import"), ("export", "list")):
             if action not in self.action_dependencies:
                 self.action_dependencies[action] = self.action_dependencies.get(fallback, [])
-        headers = list(config.fields)
+        headers, _ = config.resolve(schema)
         controller = self.controller
 
         async def download_template() -> Success:
             content = await run_in_threadpool(write_excel, headers, [])
             return Success(data={"filename": f"{self._resource}-template.xlsx", "content": b64encode(content).decode()})
 
-        async def import_excel(file: UploadFile) -> Success:
+        async def parse_upload(file: UploadFile, options: str | None) -> ExcelImportResult:
             try:
                 if not (file.filename or "").lower().endswith(".xlsx"):
                     raise BizError(Code.REQUEST_VALIDATION, "只支持 .xlsx 文件")
                 content = await file.read(MAX_FILE_BYTES + 1)
                 if len(content) > MAX_FILE_BYTES:
                     raise BizError(Code.REQUEST_VALIDATION, "Excel 文件不能超过 5MB")
-                items = await run_in_threadpool(read_excel, content, schema, config.fields)
-                async with in_transaction(get_db_conn(controller.model)):
-                    for row_number, item in enumerate(items, start=2):
-                        try:
-                            await controller.create(obj_in=item)
-                        except IntegrityError as exc:
-                            raise BizError(Code.DUPLICATE_RESOURCE, f"第 {row_number} 条记录违反唯一键或外键约束，导入已全部回滚") from exc
-                return Success(msg="导入成功", data={"importedCount": len(items)})
+                try:
+                    selection = ExcelImportOptions.model_validate_json(options) if options is not None else ExcelImportOptions()
+                except ValidationError as exc:
+                    raise BizError(Code.REQUEST_VALIDATION, "Excel 导入选项无效") from exc
+                return await run_in_threadpool(parse_excel, content, schema, config, selection)
             finally:
                 await file.close()
+
+        async def preview_import(file: UploadFile, options: str | None = Form(None)) -> Success:
+            result = await parse_upload(file, options)
+            return Success(data=result.preview.model_dump(mode="json", by_alias=True))
+
+        async def import_excel(file: UploadFile, options: str | None = Form(None)) -> Success:
+            result = await parse_upload(file, options)
+            if result.preview.errors:
+                raise BizError(Code.REQUEST_VALIDATION, result.preview.errors[0])
+            async with in_transaction(get_db_conn(controller.model)):
+                for row_number, item in result.rows:
+                    try:
+                        await controller.create(obj_in=item)
+                    except IntegrityError as exc:
+                        raise BizError(Code.DUPLICATE_RESOURCE, f"第 {row_number} 行违反唯一键或外键约束，导入已全部回滚") from exc
+            return Success(msg="导入成功", data={"importedCount": len(result.rows)})
 
         # Import remains coupled to create availability; export to list availability.
         if "create" in self.enable_routes:
             self._register_spec("import_template", f"/{self._resource}/import-template", {"GET"}, f"下载{self.summary_prefix}导入模板", download_template)
+            self._register_spec("import_preview", f"/{self._resource}/import-preview", {"POST"}, f"预览{self.summary_prefix}导入", preview_import)
             self._register_spec("import", f"/{self._resource}/import", {"POST"}, f"导入{self.summary_prefix}", import_excel)
         if "list" not in self.enable_routes or not self.list_schema:
             return

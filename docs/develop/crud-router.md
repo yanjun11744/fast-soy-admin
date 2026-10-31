@@ -298,28 +298,68 @@ crud = CRUDRouter(
 )
 ```
 
-新增三个接口，保持原有六个 CRUD 接口不变：
+新增四个接口，保持原有六个 CRUD 接口不变：
 
 | 接口 | 用途 |
 | --- | --- |
 | `GET /customers/import-template` | 下载只有字段表头的模板 |
-| `POST /customers/import` | multipart 上传，字段名为 `file` |
+| `POST /customers/import-preview` | 只读识别、字段映射和整表校验，不写入数据库 |
+| `POST /customers/import` | multipart 上传，字段名为 `file`；提交时重新校验 |
 | `POST /customers/export` | 使用列表搜索 Schema 筛选，导出全部匹配记录，忽略当前页码和每页数量 |
 
 模板、导出接口通过 `Success(data={"filename": "...xlsx", "content": "Base64..."})` 返回文件，前端 `ExcelTransfer` 组件配合 `downloadExcel` 下载，沿用统一请求、鉴权和 Token 刷新流程。导入成功返回 `Success(data={"importedCount": N})`，页面刷新第一页。
 
-- 仅支持 `.xlsx`，上传最大 5MB，解压后最大 50MB，单工作表、最多 10000 行；导出最多 10000 条，超限时必须缩小筛选范围，不会静默截断。
-- 表头支持 Schema 字段名、camelCase 别名和无歧义的字段标题。推荐直接使用下载模板。空行跳过、空单元格按未提供处理；必填字段仍由创建 Schema 校验。
+- 仅支持 `.xlsx`，上传最大 5MB，解压后最大 50MB，每次选择一个工作表、表头后最多 10000 行、最多 200 列；导出最多 10000 条，超限时必须缩小筛选范围，不会静默截断。
+- 模板与导出表头优先使用 `ExcelColumn.title`，其次使用 Schema `Field(title=...)`，最后回退字段名；现有英文表头仍可导入。
+- 导入表头只与字段名、Schema alias、Schema title、Excel title 和显式别名精确匹配。不去空格、不忽略大小写、不转换全半角、不做模糊推荐。不同字段的名称或别名冲突时，路由初始化直接报错。
+- 自动扫描前 100 行，通过必填字段命中数和全部字段命中数识别唯一表头候选；不能唯一确定时必须指定 `headerRow`。多工作表必须选择 `sheet`，不会自动合并。
+- 空行跳过、空单元格按未提供处理；必填字段仍由创建 Schema 校验。未知列默认阻止导入，只有显式映射为 `null` 才忽略；多列映射到同一个字段时阻止导入。
 - 导入只创建记录，不按 ID 覆盖已有记录。先校验整张表，再在模型所在数据库事务中逐条调用 `controller.create`，保留创建审计；唯一键、外键冲突会全部回滚。失败提示行号和字段，不回显单元格数据。
 - JSON 字段使用 JSON 文本；日期时间使用 ISO 格式；外键沿用 Sqid 字符串；大整数与 Decimal 以文本保存，避免 Excel 精度丢失。上传中的公式拒绝导入；导出的公式形文本以字符串存储。
 - Excel 字段只能来自 `create_schema` 的显式白名单，不能包含 `exclude_fields`；生成器自动排除这些字段。不要将密码、Token 等敏感字段配置到白名单。
-- 未开启 `excel` 的现有 CRUD 不会新增任何接口。禁用 `create` 时不注册导入和模板接口；禁用 `list` 时不注册导出接口。
+- 未开启 `excel` 的现有 CRUD 不会新增任何接口。禁用 `create` 时不注册导入、预览和模板接口；禁用 `list` 时不注册导出接口。
+
+### 中文表头与精确别名
+
+通常只需在创建 Schema 中设置 `Field(title="客户名称")`。额外名称在 Excel 配置中声明，不改变 JSON API 的 alias：
+
+```python
+from app.utils import ExcelColumn, ExcelConfig
+
+excel = ExcelConfig(
+    fields=("name", "phone"),
+    columns={
+        "name": ExcelColumn(aliases=("客户姓名", "Customer Name")),
+        "phone": ExcelColumn(title="手机号码", aliases=("联系电话", "Phone")),
+    },
+)
+```
+
+`Phone` 不会匹配 `phone ` 或 `PHONE`。同一字段重复声明同一个名称允许，不同字段占用相同名称会报错。`columns` 的键必须属于 `fields` 白名单。
+
+### 预览与确认导入
+
+新生成的前端页面已经接好 `previewApi`。已生成页面需更新 service，并为 `ExcelTransfer` 传入 `:preview-api="fetchPreviewImportCustomer"`；未提供此属性的旧页面仍沿用直接导入。
+
+预览与提交均接收 multipart `file`，以及可选的 `options` JSON 字符串：
+
+```json
+{"sheet":"客户清单","headerRow":3,"columns":["name","phone",null]}
+```
+
+- `sheet`：工作表的准确名称；单工作表可省略。
+- `headerRow`：1–100 的实际表头行号；省略时自动识别。
+- `columns`：按原始列顺序提供内部字段名，`null` 表示用户明确忽略此列；省略时按精确别名识别。必须与表头列数一致，不能使用白名单之外的字段。
+
+预览返回工作表、表头行、目标字段、每列前 3 条样例（每格最多 120 字符）、非空行数和最多 20 条错误。修改映射后必须重新校验才能确认导入。文件在确认时重新上传并完整解析，不保存临时文件、不信任前端预览结果；错误使用实际工作表行号。
+
+预览只校验表格和 Schema，不执行 `controller.create`，因此数据库唯一键、外键或业务创建流程仍可能在最终提交时报错并回滚。日期、枚举和外键仍遵循原有格式；本次不加入字典值翻译或名称转 ID，也不扩展 `.xls`、CSV、多级合并表头。
 
 ### 权限与自定义流程
 
-生成模块继续使用模块的 API 权限依赖。开启 `--button-auth` 时，还会生成 `B_<MODULE>_<MODEL>_IMPORT` / `EXPORT` 两个按钮及接口依赖：模板与导入共享 IMPORT，导出使用 EXPORT；普通角色需要在角色管理中分别授权 API 和按钮。不会自动为现有角色扩大权限。
+生成模块继续使用模块的 API 权限依赖。开启 `--button-auth` 时，还会生成 `B_<MODULE>_<MODEL>_IMPORT` / `EXPORT` 两个按钮及接口依赖：预览、模板与导入共享 IMPORT，导出使用 EXPORT；普通角色需要在角色管理中分别授权 API 和按钮。不会自动为现有角色扩大权限。
 
-手工接入时可以用 `action_dependencies` 配置 `import`、`import_template`、`export`。未显式配置时分别继承 `create`、`create`、`list` 的动作依赖。
+手工接入时可以用 `action_dependencies` 配置 `import`、`import_preview`、`import_template`、`export`。导入默认继承 `create`；预览与模板默认继承 `import`；导出默认继承 `list`。新预览路由仍需给普通角色授权对应 API，不会自动扩大现有角色权限。
 
 默认导出复用搜索配置、排序、`data_policy` 和显式传入的异步 `excel_scope_filter(request) -> Q`。生成器的 `--data-scope` 会为导出生成与列表相同的行级过滤。若自行 override 列表查询，必须同步导出的约束或使用 `@crud.override("export")`，防止越过数据范围。
 
