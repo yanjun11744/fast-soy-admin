@@ -43,7 +43,10 @@ declare namespace Api {
         partNo?: string;
         name?: string;
         unit?: string;
-        orderDueDate?: string;
+        orderDueDateStart?: string;
+        orderDueDateEnd?: string;
+        completedDateStart?: string;
+        completedDateEnd?: string;
       } & CommonSearchParams
     >;
 

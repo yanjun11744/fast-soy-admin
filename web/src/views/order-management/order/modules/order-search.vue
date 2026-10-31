@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { $t } from '@/locales';
 
 
@@ -12,6 +13,26 @@ interface Emits {
 
 const emit = defineEmits<Emits>();
 const model = defineModel<Api.OrderManagementManage.OrderSearchParams>('model', { required: true });
+
+const orderDueDateRange = computed<[string, string] | null>({
+  get: (): [string, string] | null => model.value.orderDueDateStart && model.value.orderDueDateEnd
+    ? [model.value.orderDueDateStart, model.value.orderDueDateEnd]
+    : null,
+  set: (value: [string, string] | null) => {
+    model.value.orderDueDateStart = value?.[0] ?? null;
+    model.value.orderDueDateEnd = value?.[1] ?? null;
+  }
+});
+
+const completedDateRange = computed<[string, string] | null>({
+  get: (): [string, string] | null => model.value.completedDateStart && model.value.completedDateEnd
+    ? [model.value.completedDateStart, model.value.completedDateEnd]
+    : null,
+  set: (value: [string, string] | null) => {
+    model.value.completedDateStart = value?.[0] ?? null;
+    model.value.completedDateEnd = value?.[1] ?? null;
+  }
+});
 
 function reset() {
   emit('reset');
@@ -41,7 +62,10 @@ function search() {
               <NInput v-model:value="model.unit" :placeholder="$t('page.order_management.order.form.unit')" />
             </NFormItemGi>
             <NFormItemGi span="24 s:12 m:6" :label="$t('page.order_management.order.orderDueDate')" path="orderDueDate" class="pr-24px">
-              <NDatePicker v-model:formatted-value="model.orderDueDate" type="date" value-format="yyyy-MM-dd" clearable class="w-full" />
+              <NDatePicker v-model:formatted-value="orderDueDateRange" type="daterange" value-format="yyyy-MM-dd" clearable class="w-full" />
+            </NFormItemGi>
+            <NFormItemGi span="24 s:12 m:6" :label="$t('page.order_management.order.completedDate')" path="completedDate" class="pr-24px">
+              <NDatePicker v-model:formatted-value="completedDateRange" type="daterange" value-format="yyyy-MM-dd" clearable class="w-full" />
             </NFormItemGi>
             <NFormItemGi span="24 s:12 m:6">
               <NSpace class="w-full" justify="end">

@@ -25,7 +25,10 @@ const defaultSearchParams: Api.OrderManagementManage.OrderSearchParams = {
   partNo: null,
   name: null,
   unit: null,
-  orderDueDate: null,
+  orderDueDateStart: null,
+  orderDueDateEnd: null,
+  completedDateStart: null,
+  completedDateEnd: null,
 };
 
 const searchParams: Api.OrderManagementManage.OrderSearchParams = reactive({ ...defaultSearchParams });

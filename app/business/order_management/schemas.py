@@ -42,4 +42,7 @@ class OrderUpdate(OrderBase): ...
 
 
 class OrderSearch(OrderBase, PageQueryBase):
-    pass
+    order_due_date_start: date | None = Field(None, title="订单完工期开始")
+    order_due_date_end: date | None = Field(None, title="订单完工期结束")
+    completed_date_start: date | None = Field(None, title="实际完工期开始")
+    completed_date_end: date | None = Field(None, title="实际完工期结束")

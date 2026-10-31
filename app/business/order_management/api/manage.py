@@ -20,7 +20,10 @@ order_crud = CRUDRouter(
     update_schema=OrderUpdate,
     list_schema=OrderSearch,
     route_key_prefix="order_management.orders",
-    search_fields=SearchFieldConfig(contains_fields=['order_no', 'part_no', 'name', 'unit', 'process_route', 'customer']),
+    search_fields=SearchFieldConfig(
+        contains_fields=['order_no', 'part_no', 'name', 'unit', 'process_route', 'customer'],
+        range_fields=['order_due_date', 'completed_date'],
+    ),
     summary_prefix="订单资料",
 )
 
