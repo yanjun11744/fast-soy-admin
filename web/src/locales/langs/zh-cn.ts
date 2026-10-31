@@ -7,6 +7,11 @@ const local: App.I18n.BaseSchema = {
     updateCancel: '稍后再说'
   },
   common: {
+    excelImport: '导入 Excel',
+    excelExport: '导出 Excel',
+    excelTemplate: '下载导入模板',
+    excelFileLimit: '仅支持 5MB 以内的 .xlsx 文件',
+    excelImportSuccess: '成功导入 {count} 条数据',
     action: '操作',
     add: '新增',
     addSuccess: '添加成功',

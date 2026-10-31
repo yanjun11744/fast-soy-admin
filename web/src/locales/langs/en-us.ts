@@ -7,6 +7,11 @@ const local: App.I18n.BaseSchema = {
     updateCancel: 'Later'
   },
   common: {
+    excelImport: 'Import Excel',
+    excelExport: 'Export Excel',
+    excelTemplate: 'Download import template',
+    excelFileLimit: 'Upload an .xlsx file no larger than 5MB',
+    excelImportSuccess: 'Imported {count} records',
     action: 'Action',
     add: 'Add',
     addSuccess: 'Add Success',

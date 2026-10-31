@@ -1,13 +1,20 @@
+from base64 import b64encode
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, UploadFile
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
+from tortoise.exceptions import IntegrityError
+from tortoise.transactions import in_transaction
 
 from app.core.base_schema import CommonIds, Success, SuccessExtra
-from app.core.crud import CRUDBase
+from app.core.code import Code
+from app.core.crud import CRUDBase, get_db_conn
+from app.core.excel import MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, read_excel, write_excel
+from app.core.exceptions import BizError
 from app.core.sqids import encode_id
 from app.core.types import SqidPath
 
@@ -116,6 +123,8 @@ class CRUDRouter:
         action_dependencies: dict[str, Sequence[Any]] | None = None,
         route_key_prefix: str | None = None,
         data_policy: str | None = None,
+        excel: ExcelConfig | None = None,
+        excel_scope_filter: Callable | None = None,
     ):
         """
         Args:
@@ -150,6 +159,10 @@ class CRUDRouter:
             route_key_prefix: 路由稳定标识前缀，例如 ``crm.customers``。
                 传入后标准路由会生成 ``crm.customers.list`` 等
                 ``APIRoute.name``，用于权限声明引用。
+            excel: 显式开启简单资源的 Excel 导入/导出，字段必须来自 create_schema。
+                导入调用 controller.create；自定义创建流程需 override("import")。
+            excel_scope_filter: 异步 Request → Q，仅用于附加导出的行级过滤。
+                自定义列表查询必须将相同约束应用到此过滤器或 override("export")。
             data_policy: 列表接口读取策略名。传入后默认 list 路由会自动
                 ``q &= await apply_data_policy(data_policy)``。
         """
@@ -165,9 +178,11 @@ class CRUDRouter:
         self.record_transform = record_transform
         self.soft_delete = soft_delete
         self.tree_endpoint = tree_endpoint
-        self.action_dependencies: dict[str, Sequence[Any]] = action_dependencies or {}
+        self.action_dependencies: dict[str, Sequence[Any]] = dict(action_dependencies or {})
         self.route_key_prefix = route_key_prefix.rstrip(".") if route_key_prefix else None
         self.data_policy = data_policy
+        self.excel = excel
+        self.excel_scope_filter = excel_scope_filter
 
         # 资源名（从 prefix 提取，如 "/roles" → "roles"）
         self._resource = prefix.strip("/").split("/")[-1]
@@ -180,6 +195,8 @@ class CRUDRouter:
 
         self.router = _OrderedRouter()
         self._register_routes()
+        if self.excel:
+            self._add_excel_routes()
         if self.tree_endpoint:
             self._add_tree_route()
 
@@ -232,6 +249,9 @@ class CRUDRouter:
             "update": f"async def update_item(item_id: SqidPath, obj_in: {self.update_schema.__name__})" if self.update_schema else "async def update_item(item_id: SqidPath)",
             "delete": "async def delete_item(item_id: SqidPath)",
             "batch_delete": "async def batch_delete(obj_in: CommonIds)",
+            "import": "async def import_excel(file: UploadFile)",
+            "import_template": "async def download_template()",
+            "export": f"async def export_excel(obj_in: {self.list_schema.__name__}, request: Request)" if self.list_schema else "",
         }
         spec["signature"] = signatures.get(name, "")
         return spec
@@ -423,6 +443,81 @@ class CRUDRouter:
             f"批量删除{self.summary_prefix}",
             batch_delete,
         )
+
+    def _add_excel_routes(self) -> None:
+        """Explicit opt-in: keep existing system CRUD and custom write flows unchanged."""
+        config = self.excel
+        schema = self.create_schema
+        if not config or not schema:
+            raise ValueError("Excel requires a create_schema and explicit fields")
+        if not config.fields or not set(config.fields) <= set(schema.model_fields):
+            raise ValueError("Excel fields must be nonempty create_schema field names")
+        if set(config.fields) & set(self.exclude_fields):
+            raise ValueError("Excel fields cannot include excluded fields")
+        for action, fallback in (("import", "create"), ("import_template", "create"), ("export", "list")):
+            if action not in self.action_dependencies:
+                self.action_dependencies[action] = self.action_dependencies.get(fallback, [])
+        headers = list(config.fields)
+        controller = self.controller
+
+        async def download_template() -> Success:
+            content = await run_in_threadpool(write_excel, headers, [])
+            return Success(data={"filename": f"{self._resource}-template.xlsx", "content": b64encode(content).decode()})
+
+        async def import_excel(file: UploadFile) -> Success:
+            try:
+                if not (file.filename or "").lower().endswith(".xlsx"):
+                    raise BizError(Code.REQUEST_VALIDATION, "只支持 .xlsx 文件")
+                content = await file.read(MAX_FILE_BYTES + 1)
+                if len(content) > MAX_FILE_BYTES:
+                    raise BizError(Code.REQUEST_VALIDATION, "Excel 文件不能超过 5MB")
+                items = await run_in_threadpool(read_excel, content, schema, config.fields)
+                async with in_transaction(get_db_conn(controller.model)):
+                    for row_number, item in enumerate(items, start=2):
+                        try:
+                            await controller.create(obj_in=item)
+                        except IntegrityError as exc:
+                            raise BizError(Code.DUPLICATE_RESOURCE, f"第 {row_number} 条记录违反唯一键或外键约束，导入已全部回滚") from exc
+                return Success(msg="导入成功", data={"importedCount": len(items)})
+            finally:
+                await file.close()
+
+        # Import remains coupled to create availability; export to list availability.
+        if "create" in self.enable_routes:
+            self._register_spec("import_template", f"/{self._resource}/import-template", {"GET"}, f"下载{self.summary_prefix}导入模板", download_template)
+            self._register_spec("import", f"/{self._resource}/import", {"POST"}, f"导入{self.summary_prefix}", import_excel)
+        if "list" not in self.enable_routes or not self.list_schema:
+            return
+        search_schema = self.list_schema
+
+        async def export_excel(obj_in: search_schema, request: Request) -> Success:  # type: ignore[valid-type]
+            search = self.search_fields
+            q = controller.build_search(obj_in, **vars(search))
+            if self.data_policy:
+                from app.core.policy import apply_data_policy
+
+                module = self.route_key_prefix.split(".", 1)[0] if self.route_key_prefix else None
+                q &= await apply_data_policy(self.data_policy, module=module)
+            if self.excel_scope_filter:
+                q &= await self.excel_scope_filter(request)
+            order = getattr(obj_in, "order_by", None) or self.list_order
+            total, objects = await controller.list(page=1, page_size=MAX_ROWS + 1, search=q, order=order)
+            if total > MAX_ROWS or len(objects) > MAX_ROWS:
+                raise BizError(Code.REQUEST_VALIDATION, f"导出最多 {MAX_ROWS} 行，请缩小筛选范围")
+            records = []
+            for obj in objects:
+                if self.record_transform:
+                    record = await self._to_record(obj)
+                    records.append([record.get(schema.model_fields[name].alias or name) for name in config.fields])
+                else:
+                    # Schema serializers preserve Sqid FK IDs, decimals and ISO dates.
+                    values = {name: getattr(obj, name) for name in config.fields}
+                    record = schema.model_construct(**values).model_dump(mode="json", include=set(config.fields))
+                    records.append([record.get(name) for name in config.fields])
+            content = await run_in_threadpool(write_excel, headers, records)
+            return Success(data={"filename": f"{self._resource}.xlsx", "content": b64encode(content).decode()})
+
+        self._register_spec("export", f"/{self._resource}/export", {"POST"}, f"导出{self.summary_prefix}", export_excel)
 
     # ---- 树形端点 ----
 
