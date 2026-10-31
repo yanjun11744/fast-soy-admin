@@ -9,7 +9,7 @@ const local: App.I18n.BaseSchema = {
   common: {
     excelPreview: 'Import preview',
     excelExactMatch:
-      'Headers must exactly match a configured name or alias, including case, spaces and character width. Map or explicitly ignore unknown columns, then validate again.',
+      'Headers must exactly match a configured name or alias, including case, spaces and character width. Unknown columns are ignored by default. You can map them manually, then validate again.',
     excelSheet: 'Worksheet',
     excelHeaderRow: 'Header row (1–100, blank for auto detection)',
     excelValidate: 'Detect and validate',

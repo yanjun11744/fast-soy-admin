@@ -48,7 +48,6 @@ def test_excel_accepts_titles_and_aliases(headers):
 
 
 @pytest.mark.parametrize("headers,rows", [
-    (["item_name", "amount", "due_date", "secret"], [["private", 1, "2026-10-30", "hidden"]]),
     (["item_name", "itemName", "due_date"], [["private", 1, "2026-10-30"]]),
     (["item_name"], [["private"]]),
     (["item_name", "amount", "due_date"], [["private", "invalid", "2026-10-30"]]),
@@ -222,7 +221,7 @@ def test_excel_columns_share_titles_and_exact_aliases():
 @pytest.mark.parametrize("label", [" 名称", "名称 ", "名称\n", "item name", "ITEM NAME", "Ｉｔｅｍ Ｎａｍｅ", "商品名"])
 def test_excel_never_normalizes_or_guesses_aliases(label):
     content = write_excel([label, "金额", "到期日期"], [["private", 1, "2026-10-30"]])
-    with pytest.raises(BizError, match="必须完全一致"):
+    with pytest.raises(BizError, match="缺少必填列"):
         read_excel(content, Row, row_config())
 
 
@@ -249,10 +248,11 @@ def test_excel_detects_reordered_headers_after_preamble_and_keeps_physical_rows(
     assert result.rows[0][1].item_name == "example"
 
 
-def test_excel_preview_requires_explicit_ignore_and_validates_mappings():
+def test_excel_preview_ignores_unknown_columns_by_default_and_validates_mappings():
     content = write_excel(["名称", "金额", "到期日期", "其他"], [["example", 1, "2026-10-30", "private"]])
     preview = parse_excel(content, Row, row_config()).preview
-    assert preview.errors and preview.columns[-1].field is None
+    assert not preview.errors and preview.columns[-1].field is None
+    assert read_excel(content, Row, row_config())[0].item_name == "example"
     options = ExcelImportOptions(columns=["item_name", "amount", "due_date", None])
     result = parse_excel(content, Row, row_config(), options)
     assert not result.preview.errors and len(result.rows) == 1
@@ -322,17 +322,16 @@ async def test_excel_http_preview_is_readonly_and_commit_rechecks_options(app):
         content = write_excel(["Type", "标签", "值", "附加列"], [["preview-test", "label", "value", "private"]])
         files = {"file": ("items.xlsx", content)}
         preview = (await client.post("/items/import-preview", files=files)).json()["data"]
-        assert preview["headerRow"] == 1 and preview["rowCount"] == 1 and preview["errors"]
+        assert preview["headerRow"] == 1 and preview["rowCount"] == 1 and not preview["errors"]
         assert not await Dictionary.filter(dict_type="preview-test").exists()
         options = '{"columns":["dict_type","label","value",null]}'
         checked = (await client.post("/items/import-preview", files=files, data={"options": options})).json()["data"]
         assert not checked["errors"]
         assert not await Dictionary.filter(dict_type="preview-test").exists()
-        assert (await client.post("/items/import", files=files)).json()["code"] != "0000"
         for invalid in ('{"columns":["dict_type","label","value","id"]}', '{"headerRow":0}', 'not-json'):
             response = await client.post("/items/import", files=files, data={"options": invalid})
             assert response.json()["code"] != "0000"
-        imported = (await client.post("/items/import", files=files, data={"options": options})).json()
+        imported = (await client.post("/items/import", files=files)).json()
         assert imported["data"]["importedCount"] == 1
     await Dictionary.filter(dict_type="preview-test").delete()
 

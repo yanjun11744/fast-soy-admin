@@ -262,7 +262,7 @@ Preview and import accept multipart `file` and an optional JSON string named `op
 {"sheet":"Customers","headerRow":3,"columns":["name","phone",null]}
 ```
 
-`sheet` is required for workbooks with multiple sheets. `headerRow` is a 1-based row number within the first 100 rows; omit it to detect a unique candidate based on exact required-field matches and total field matches. `columns` maps each source column to a whitelisted internal field name, with `null` explicitly ignoring a column. Unknown columns otherwise block import, as do duplicate target fields or missing required fields.
+`sheet` is required for workbooks with multiple sheets. `headerRow` is a 1-based row number within the first 100 rows; omit it to detect a unique candidate based on exact required-field matches and total field matches. `columns` maps each source column to a whitelisted internal field name, with `null` explicitly ignoring a column. Unknown columns are ignored by default and can be mapped manually in the preview. Duplicate target fields and missing required fields still block import.
 
 The preview includes sheet names, selected header row, target fields, the first three samples per column (up to 120 characters per sample), nonempty row count and up to 20 errors. Generated pages connect `ExcelTransfer.previewApi` automatically. Existing pages need a preview service and the `preview-api` prop; without it they retain direct import. Any selection or mapping change requires revalidation before confirmation. Confirmation uploads and parses the file again; no temporary upload storage is used.
 
