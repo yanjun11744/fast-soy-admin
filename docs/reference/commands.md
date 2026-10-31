@@ -70,6 +70,8 @@ uv run python -m app.cli crud utility_fee \
   --search-fields UtilityBill:room_id,billing_date,status
 ```
 
+`DateField` / `DatetimeField` 默认进入日期范围查询候选。生成的后端使用 `range_fields` 和 `<field>_start` / `<field>_end`（包含起止边界），前端使用日期／时间范围选择器，提交 `<field>Start` / `<field>End`；清空或重置后不附加日期条件。日期字段不会生成文本 `contains` 或单值精确匹配；新增、编辑表单仍使用单值日期控件。仅修改模板不会更新已经生成的业务模块。
+
 后端高级能力也可直接从 CLI 调用：
 
 ```bash

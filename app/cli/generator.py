@@ -6,7 +6,7 @@ from pathlib import Path
 from pprint import pformat
 
 from app.cli.options import BackendFeatureOptions
-from app.cli.parser import FieldInfo, ModelInfo, RelationInfo, collect_extra_imports
+from app.cli.parser import DATE_RANGE_FIELD_TYPES, FieldInfo, ModelInfo, RelationInfo, collect_extra_imports
 
 # Tortoise 整型字段 → 约束类型别名（来自 app.utils.types）
 INT_FIELD_CONSTRAINT: dict[str, str] = {
@@ -173,7 +173,12 @@ def gen_schemas(module_name: str, models: list[ModelInfo]) -> str:
 
         # ---- Search ----
         lines.append(f"class {model.name}Search({model.name}Base, PageQueryBase):")
-        lines.append("    pass")
+        range_fields = [f for f in schema_fields if f.field_type in DATE_RANGE_FIELD_TYPES]
+        for f in range_fields:
+            for suffix, label in (("start", "开始"), ("end", "结束")):
+                lines.append(f'    {f.name}_{suffix}: {f.python_type} | None = Field(None, title="{f.description or f.name}{label}")')
+        if not range_fields:
+            lines.append("    pass")
         lines.append("")
         lines.append("")
 
@@ -244,12 +249,14 @@ def _button_action_dependencies(module_name: str, model: ModelInfo) -> list[str]
     ]
 
 
-def _search_config_parts(contains: list[str], exact: list[str]) -> list[str]:
+def _search_config_parts(contains: list[str], exact: list[str], ranges: list[str]) -> list[str]:
     parts: list[str] = []
     if contains:
         parts.append(f"contains_fields={_py_list(contains)}")
     if exact:
         parts.append(f"exact_fields={_py_list(exact)}")
+    if ranges:
+        parts.append(f"range_fields={_py_list(ranges)}")
     return parts
 
 
@@ -287,6 +294,7 @@ def _append_list_override(
     model: ModelInfo,
     contains: list[str],
     exact: list[str],
+    ranges: list[str],
     options: BackendFeatureOptions,
 ) -> None:
     if not options.needs_list_override(model.name):
@@ -306,6 +314,8 @@ def _append_list_override(
         lines.append(f"        contains_fields={_py_list(contains)},")
     if exact:
         lines.append(f"        exact_fields={_py_list(exact)},")
+    if ranges:
+        lines.append(f"        range_fields={_py_list(ranges)},")
     lines.append("    )")
     if scope:
         lines.extend([
@@ -343,6 +353,7 @@ def gen_api_manage(
     needs_scope = bool(backend_options.data_scope)
     needs_buttons = bool(backend_options.button_auth_models)
     needs_search_config = any(contains_map.get(model.name) for model in models)
+    needs_search_config = needs_search_config or any(f.field_type in DATE_RANGE_FIELD_TYPES for model in models for f in model.schema_fields)
     if exact_map is None:
         needs_search_config = needs_search_config or any(any(f.enum_type or f.name == "status" for f in model.schema_fields) for model in models)
     else:
@@ -402,7 +413,10 @@ def gen_api_manage(
         else:
             exact = exact_map.get(m.name, [])
 
-        search_parts = _search_config_parts(contains, exact)
+        ranges = [f.name for f in m.schema_fields if f.field_type in DATE_RANGE_FIELD_TYPES]
+        contains = [name for name in contains if name not in ranges]
+        exact = [name for name in exact if name not in ranges]
+        search_parts = _search_config_parts(contains, exact, ranges)
 
         scope = backend_options.data_scope.get(m.name)
         if scope:
@@ -451,7 +465,7 @@ def gen_api_manage(
         lines.append(f'    summary_prefix="{m.cn_name}",')
         lines.append(")")
         lines.append("")
-        _append_list_override(lines, module_name, m, contains, exact, backend_options)
+        _append_list_override(lines, module_name, m, contains, exact, ranges, backend_options)
 
     # router
     lines.append(f'router = APIRouter(tags=["{module_name}"])')

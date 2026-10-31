@@ -81,7 +81,7 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"], "max_content_width": 
 @click.option("--cn-name", default=None, help="模块中文名（用于 i18n）")
 @click.option("--models", "models_spec", default=None, help="要生成 CRUD 的模型，逗号分隔；支持序号、类名、all")
 @click.option("-y", "--yes", "assume_yes", is_flag=True, help="不进入交互，使用全模型与推荐默认配置")
-@click.option("--contains", "contains_specs", multiple=True, help="后端模糊查询字段；普通 CharField/TextField 优先放这里，例: Product:name,code")
+@click.option("--contains", "contains_specs", multiple=True, help="后端文本模糊/日期范围查询字段；日期默认按时间段查询，例: Product:name,code")
 @click.option("--exact", "exact_specs", multiple=True, help="后端精确查询字段；适合外键 *_id、布尔、枚举字段/枚举类、唯一字段或字典值等，例: Product:status_type,warehouse_id")
 @click.option("--list-fields", "list_field_specs", multiple=True, help="前端列表字段，例: Product:name,warehouse_id,status_type")
 @click.option("--search-fields", "search_field_specs", multiple=True, help="前端搜索字段，例: Product:name,status_type")

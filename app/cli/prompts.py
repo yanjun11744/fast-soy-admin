@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import click
 
-from app.cli.parser import FieldInfo, ModelInfo, RelationInfo
+from app.cli.parser import DATE_RANGE_FIELD_TYPES, FieldInfo, ModelInfo, RelationInfo
 
 
 @dataclass(frozen=True)
@@ -146,15 +146,15 @@ def prompt_fields(
 
 
 def fuzzy_field_candidates(model: ModelInfo) -> list[FieldInfo]:
-    """Fields suitable for contains-based fuzzy search."""
-    return [field for field in model.schema_fields if field.field_type in ("CharField", "TextField")]
+    """Text fuzzy matches and date ranges offered by default."""
+    return [field for field in model.schema_fields if field.field_type in {"CharField", "TextField"} | DATE_RANGE_FIELD_TYPES]
 
 
 def exact_field_candidates(model: ModelInfo, contains_map: dict[str, list[str]] | None = None) -> list[PromptChoice]:
     """Fields suitable for exact matching."""
     contains = set((contains_map or {}).get(model.name, []))
     choices: list[PromptChoice] = []
-    skip_types = {"TextField", "JSONField"}
+    skip_types = {"TextField", "JSONField"} | DATE_RANGE_FIELD_TYPES
 
     for field in model.schema_fields:
         if field.name in contains or field.field_type in skip_types:
@@ -188,7 +188,7 @@ def default_exact_field_names(model: ModelInfo, candidates: list[PromptChoice]) 
 
 def prompt_contains_fields(models: list[ModelInfo]) -> dict[str, list[str]]:
     """Choose contains-based fuzzy search fields."""
-    return prompt_fields(models, "模糊查询字段（普通 CharField/TextField）", fuzzy_field_candidates)
+    return prompt_fields(models, "模糊/范围查询字段（文本模糊匹配，日期按时间段）", fuzzy_field_candidates)
 
 
 def prompt_exact_fields(models: list[ModelInfo], contains_map: dict[str, list[str]]) -> dict[str, list[str]]:
@@ -242,6 +242,7 @@ def default_frontend_search_field_names(search_maps: Sequence[dict[str, list[str
     def default_names(model: ModelInfo, candidates: list[PromptChoice]) -> list[str]:
         candidate_names = {choice.name for choice in candidates}
         names: list[str] = []
+        names.extend(field.name for field in model.schema_fields if field.field_type in DATE_RANGE_FIELD_TYPES and field.name in candidate_names)
         for search_map in search_maps:
             for name in search_map.get(model.name, []):
                 if name in candidate_names and name not in names:

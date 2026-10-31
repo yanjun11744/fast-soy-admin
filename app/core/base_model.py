@@ -1,5 +1,5 @@
 # pyright: reportIncompatibleVariableOverride=false
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID
@@ -39,6 +39,8 @@ class BaseModel(models.Model):
                     if fmt_datetime:
                         d[to_lower_camel_case("fmt_" + field)] = value.strftime(APP_SETTINGS.DATETIME_FORMAT)
                     value = int(value.timestamp() * 1000)
+                elif isinstance(value, date):
+                    value = value.isoformat()
                 elif isinstance(value, UUID):
                     value = str(value)
                 elif isinstance(value, Decimal):
@@ -61,6 +63,8 @@ class BaseModel(models.Model):
                                 if fmt_datetime:
                                     d[to_lower_camel_case("fmt_" + field)] = v.strftime(APP_SETTINGS.DATETIME_FORMAT)
                                 v = int(v.timestamp() * 1000)
+                            elif isinstance(v, date):
+                                v = v.isoformat()
                             elif isinstance(v, UUID):
                                 v = str(v)
                             elif isinstance(v, Decimal):
