@@ -41,7 +41,7 @@ def _check_migrations_dir() -> str | None:
     app_system_dir = MIGRATIONS_DIR / "app_system"
     if not app_system_dir.is_dir():
         return None
-    migration_files = [f for f in app_system_dir.iterdir() if f.suffix == ".py" and f.name != "__init__.py"]
+    migration_files = [f for f in app_system_dir.iterdir() if not f.name.startswith("._") and f.suffix == ".py" and f.name != "__init__.py"]
     if not migration_files:
         return None
     return f"迁移目录 migrations/app_system/ 已存在（{len(migration_files)} 个迁移文件）"
