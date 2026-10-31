@@ -1,0 +1,45 @@
+# pyright: reportIncompatibleVariableOverride=false
+"""
+order_management — 请求/响应 Schema。
+"""
+
+from datetime import date
+from decimal import Decimal
+from typing import Annotated
+
+from pydantic import Field
+
+from app.utils import Int32, PageQueryBase, SchemaBase
+
+# ============================================================
+# 订单资料
+# ============================================================
+
+
+class OrderBase(SchemaBase):
+    order_no: Annotated[str, Field(max_length=100)] | None = Field(None, title="订单号")
+    part_no: Annotated[str, Field(max_length=200)] | None = Field(None, title="项目号")
+    name: Annotated[str, Field(max_length=200)] | None = Field(None, title="名称")
+    unit_weight: Decimal | None = Field(None, title="机内单重/kg（净重）")
+    unit: Annotated[str, Field(max_length=50)] | None = Field(None, title="单位")
+    quantity: Int32 | None = Field(None, title="数量")
+    received_quantity: Int32 | None = Field(None, title="入库数量")
+    total_weight: Decimal | None = Field(None, title="合计重量")
+    order_due_date: date | None = Field(None, title="订单完工期")
+    completed_date: date | None = Field(None, title="实际完工期")
+    process_route: Annotated[str, Field(max_length=500)] | None = Field(None, title="工艺路线")
+    customer: Annotated[str, Field(max_length=200)] | None = Field(None, title="用户")
+
+
+class OrderCreate(OrderBase):
+    order_no: Annotated[str, Field(max_length=100)] = Field(title="订单号")
+    part_no: Annotated[str, Field(max_length=200)] = Field(title="项目号")
+    name: Annotated[str, Field(max_length=200)] = Field(title="名称")
+    unit_weight: Decimal = Field(title="机内单重/kg（净重）")
+
+
+class OrderUpdate(OrderBase): ...
+
+
+class OrderSearch(OrderBase, PageQueryBase):
+    pass

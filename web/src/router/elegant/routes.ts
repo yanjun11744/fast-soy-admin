@@ -215,6 +215,26 @@ export const generatedRoutes: GeneratedRoute[] = [
     ]
   },
   {
+    name: 'order-management',
+    path: '/order-management',
+    component: 'layout.base',
+    meta: {
+      title: 'order-management',
+      i18nKey: 'route.order-management'
+    },
+    children: [
+      {
+        name: 'order-management_order',
+        path: '/order-management/order',
+        component: 'view.order-management_order',
+        meta: {
+          title: 'order-management_order',
+          i18nKey: 'route.order-management_order'
+        }
+      }
+    ]
+  },
+  {
     name: 'user-center',
     path: '/user-center',
     component: 'layout.base$view.user-center',

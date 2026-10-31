@@ -13,7 +13,6 @@ from tortoise import fields
 
 from app.utils import AuditMixin, BaseModel, StatusType
 
-
 # ---- 在下方定义你的模型 ----
 #
 # class Example(BaseModel, AuditMixin):
@@ -40,9 +39,7 @@ from app.utils import AuditMixin, BaseModel, StatusType
 # pyright: reportIncompatibleVariableOverride=false
 """订单管理 — 业务模型定义。"""
 
-from tortoise import fields
 
-from app.utils import AuditMixin, BaseModel
 
 
 class Order(BaseModel, AuditMixin):
