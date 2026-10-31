@@ -37,7 +37,7 @@ function preview(unknown = false): ExcelPreview {
       ...(unknown ? [{ index: 1, header: 'other', field: null, samples: ['value'] }] : [])
     ],
     rowCount: 1,
-    errors: unknown ? ['unrecognized column'] : []
+    errors: []
   };
 }
 
@@ -80,22 +80,35 @@ describe('Excel import preview', () => {
     wrapper.unmount();
   });
 
-  it('requires an explicit ignore choice and revalidation for an unknown column', async () => {
+  it('defaults unknown columns to ignore and submits without another validation', async () => {
+    const { wrapper, previewApi, importApi, action } = await setup(preview(true));
+    expect(wrapper.findAllComponents(select)[2].props('value')).toBe('');
+    expect(action('excelConfirmImport').attributes('disabled')).toBeUndefined();
+    await action('excelConfirmImport').trigger('click');
+    await flushPromises();
+    expect(previewApi).toHaveBeenCalledTimes(1);
+    expect(importApi).toHaveBeenCalledWith(expect.any(File), {
+      sheet: 'Data',
+      headerRow: 1,
+      columns: ['name', null]
+    });
+    wrapper.unmount();
+  });
+
+  it('requires revalidation when an ignored column is manually mapped', async () => {
     const { wrapper, previewApi, action } = await setup(preview(true));
-    expect(action('excelConfirmImport').attributes('disabled')).toBeDefined();
-    expect(action('excelValidate').attributes('disabled')).toBeDefined();
-    wrapper.findAllComponents(select)[2].vm.$emit('update:value', '');
+    wrapper.findAllComponents(select)[2].vm.$emit('update:value', 'name');
     await flushPromises();
     expect(action('excelConfirmImport').attributes('disabled')).toBeDefined();
-    previewApi.mockResolvedValue({ data: { ...preview(true), errors: [] }, error: null });
+    previewApi.mockResolvedValue({ data: { ...preview(true), errors: ['duplicate target'] }, error: null });
     await action('excelValidate').trigger('click');
     await flushPromises();
     expect(previewApi).toHaveBeenLastCalledWith(expect.any(File), {
       sheet: 'Data',
       headerRow: 1,
-      columns: ['name', null]
+      columns: ['name', 'name']
     });
-    expect(action('excelConfirmImport').attributes('disabled')).toBeUndefined();
+    expect(action('excelConfirmImport').attributes('disabled')).toBeDefined();
     wrapper.unmount();
   });
 

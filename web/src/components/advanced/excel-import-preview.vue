@@ -15,13 +15,12 @@ const busy = ref(false);
 const preview = shallowRef<ExcelPreview | null>(null);
 const sheet = ref<string | null>(null);
 const headerRow = ref<number | null>(null);
-// null means unresolved; an empty string means the user explicitly chose to ignore.
-const mapping = ref<(string | null)[]>([]);
+// An empty string selects "ignore", including columns without an exact match.
+const mapping = ref<string[]>([]);
 const validated = ref('');
 const sourceChanged = computed(
   () => sheet.value !== preview.value?.sheet || headerRow.value !== preview.value?.headerRow
 );
-const unresolved = computed(() => !sourceChanged.value && mapping.value.some(value => value === null));
 const fieldOptions = computed(() => [
   { label: $t('common.excelIgnoreColumn'), value: '' },
   ...(preview.value?.fields.map(field => ({
@@ -39,24 +38,16 @@ function selection(): ExcelImportOptions {
   return {
     sheet: sheet.value ?? undefined,
     headerRow: headerRow.value ?? undefined,
-    columns:
-      !sourceChanged.value && mapping.value.length && !unresolved.value
-        ? mapping.value.map(value => value || null)
-        : undefined
+    columns: !sourceChanged.value && mapping.value.length ? mapping.value.map(value => value || null) : undefined
   };
 }
 
 const canImport = computed(() =>
-  Boolean(
-    preview.value?.rowCount &&
-    !preview.value.errors.length &&
-    !unresolved.value &&
-    validated.value === JSON.stringify(selection())
-  )
+  Boolean(preview.value?.rowCount && !preview.value.errors.length && validated.value === JSON.stringify(selection()))
 );
 
 async function validate() {
-  if (busy.value || unresolved.value) return;
+  if (busy.value) return;
   const submitted = selection();
   busy.value = true;
   validated.value = '';
@@ -66,11 +57,7 @@ async function validate() {
     preview.value = data;
     sheet.value = data.sheet;
     headerRow.value = data.headerRow;
-    mapping.value = data.columns.map(column => column.field ?? null);
-    // Preserve explicitly ignored columns after the server accepts their mapping.
-    if (submitted.columns && submitted.sheet === data.sheet && submitted.headerRow === data.headerRow) {
-      mapping.value = data.columns.map((column, index) => (submitted.columns?.[index] === null ? '' : column.field));
-    }
+    mapping.value = data.columns.map(column => column.field ?? '');
     validated.value = JSON.stringify(selection());
   } finally {
     busy.value = false;
@@ -123,7 +110,7 @@ onMounted(validate);
           <NFormItem :label="$t('common.excelHeaderRow')" :show-feedback="false">
             <NInputNumber v-model:value="headerRow" :min="1" :max="100" :precision="0" :disabled="busy" clearable />
           </NFormItem>
-          <NButton :loading="busy" :disabled="busy || unresolved" @click="validate">
+          <NButton :loading="busy" :disabled="busy" @click="validate">
             {{ $t('common.excelValidate') }}
           </NButton>
         </NSpace>
