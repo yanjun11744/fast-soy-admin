@@ -240,8 +240,6 @@ def parse_excel(
             if len(options.columns) != len(header) or any(name is not None and name not in config.fields for name in options.columns):
                 raise BizError(Code.REQUEST_VALIDATION, "字段映射必须与表头列数一致，且只能使用允许导入的字段")
             columns = options.columns
-        elif None in columns:
-            preview.errors.append("存在未识别的列，请手动指定字段或明确选择忽略；表头与别名必须完全一致")
         mapped = [name for name in columns if name is not None]
         if len(set(mapped)) != len(mapped):
             preview.errors.append("多列对应同一个字段，请调整字段映射")

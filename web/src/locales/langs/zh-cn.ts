@@ -9,7 +9,7 @@ const local: App.I18n.BaseSchema = {
   common: {
     excelPreview: '导入预览',
     excelExactMatch:
-      '表头与配置的名称或别名必须完全一致，区分大小写、空格和全半角。未识别列需手动映射或明确忽略；调整后请重新校验。',
+      '表头与配置的名称或别名必须完全一致，区分大小写、空格和全半角。未识别列默认忽略，可手动映射；调整后请重新校验。',
     excelSheet: '工作表',
     excelHeaderRow: '表头行（1–100，留空自动识别）',
     excelValidate: '识别并校验',
