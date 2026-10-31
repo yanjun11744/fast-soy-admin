@@ -5,6 +5,9 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.autodiscover import discover_business_db_configs, discover_business_models
+from app.core.migration_compat import install_migration_file_filter
+
+install_migration_file_filter()
 
 
 class Settings(BaseSettings):
