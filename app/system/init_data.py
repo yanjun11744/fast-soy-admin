@@ -153,6 +153,8 @@ SYSTEM_INIT_DATA = {
                     "buttons": [
                         {"button_code": "B_SYSTEM_UPLOAD_CREATE", "button_desc": "上传图片"},
                         {"button_code": "B_SYSTEM_UPLOAD_CONFIG", "button_desc": "配置上传目录"},
+                        {"button_code": "B_SYSTEM_UPLOAD_EDIT", "button_desc": "编辑上传图片"},
+                        {"button_code": "B_SYSTEM_UPLOAD_DELETE", "button_desc": "删除上传图片"},
                     ],
                 },
                 {
@@ -247,11 +249,15 @@ SYSTEM_INIT_DATA = {
                 "manage_radar_exceptions",
                 "manage_radar_monitor",
             ],
-            "buttons": ["B_SYSTEM_UPLOAD_CREATE", "B_SYSTEM_UPLOAD_CONFIG"],
+            "buttons": ["B_SYSTEM_UPLOAD_CREATE", "B_SYSTEM_UPLOAD_CONFIG", "B_SYSTEM_UPLOAD_EDIT", "B_SYSTEM_UPLOAD_DELETE"],
             "apis": [
                 ("get", "/api/v1/system-manage/uploads/settings"),
                 ("patch", "/api/v1/system-manage/uploads/settings"),
                 ("post", "/api/v1/system-manage/uploads/search"),
+                ("get", "/api/v1/system-manage/uploads/images/{item_id}"),
+                ("patch", "/api/v1/system-manage/uploads/images/{item_id}"),
+                ("delete", "/api/v1/system-manage/uploads/images/{item_id}"),
+                ("delete", "/api/v1/system-manage/uploads/images"),
                 # 用户
                 *_crud_apis("users"),
                 ("post", "/api/v1/system-manage/users/{user_id}/offline"),

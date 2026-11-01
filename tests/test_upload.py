@@ -1,4 +1,5 @@
 import io
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -117,6 +118,15 @@ async def test_logged_in_user_without_upload_permission_cannot_write(app, seed_d
             assert result.json()["code"] == Code.NEED_ANY_BUTTON_PERMISSION
             result = await client.patch(f"{BASE}/settings", json={"storageRoot": "uploads", "maxSizeMb": 1})
             assert result.json()["code"] == Code.PERMISSION_DENIED
+            await app.state.redis.set(f"role:{role.role_code}:apis", json.dumps([
+                {"method": "patch", "path": f"{BASE}/images/{{item_id}}", "status": "1"},
+                {"method": "delete", "path": f"{BASE}/images", "status": "1"},
+            ]))
+            from app.core.sqids import encode_id
+            result = await client.patch(f"{BASE}/images/{encode_id(1)}", json={"name": "denied.png"})
+            assert result.json()["code"] == Code.NEED_ANY_BUTTON_PERMISSION
+            result = await client.request("DELETE", f"{BASE}/images", json={"ids": [encode_id(1)]})
+            assert result.json()["code"] == Code.NEED_ANY_BUTTON_PERMISSION
     finally:
         await user.delete()
         await role.delete()
