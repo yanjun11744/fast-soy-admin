@@ -15,9 +15,6 @@ import OrderSearch from './modules/order-search.vue';
 
 const appStore = useAppStore();
 
-
-
-
 const defaultSearchParams: Api.OrderManagementManage.OrderSearchParams = {
   current: 1,
   size: 10,
@@ -47,8 +44,8 @@ const { columns, columnChecks, data, loading, getData, getDataByPage, mobilePagi
     { key: 'partNo', title: $t('page.order_management.order.partNo'), align: 'center', minWidth: 120 },
     { key: 'name', title: $t('page.order_management.order.name'), align: 'center', minWidth: 120 },
     { key: 'unitWeight', title: $t('page.order_management.order.unitWeight'), align: 'center', minWidth: 120 },
-    { key: 'unit', title: $t('page.order_management.order.unit'), align: 'center', minWidth: 120 },
-    { key: 'quantity', title: $t('page.order_management.order.quantity'), align: 'center', minWidth: 120 },
+    { key: 'unit', title: $t('page.order_management.order.unit'), align: 'center', minWidth: 80 },
+    { key: 'quantity', title: $t('page.order_management.order.quantity'), align: 'center', minWidth: 80 },
     { key: 'totalWeight', title: $t('page.order_management.order.totalWeight'), align: 'center', minWidth: 120 },
     { key: 'orderDueDate', title: $t('page.order_management.order.orderDueDate'), align: 'center', minWidth: 120 },
     {
@@ -119,7 +116,7 @@ function edit(id: string) {
             :export-selected-api="ids => fetchExportOrder({ ...searchParams, ids })"
             :selected-ids="checkedRowKeys"
             :template-api="fetchOrderImportTemplate"
-            
+
             @imported="getDataByPage(1)"
           />
           <TableHeaderOperation
