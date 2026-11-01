@@ -24,13 +24,15 @@ tortoise_last.txt
 # Logs
 # ========================
 logs/
-uploads/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# Local image storage (keep uploaded binaries out of Git).
+/uploads/
 
 # ========================
 # Node / Frontend

@@ -10,6 +10,8 @@ export interface UploadedImage {
   width: number;
   height: number;
   fmtCreatedAt: string;
+  fmtUpdatedAt: string;
+  uploader: string;
 }
 
 export interface UploadSetting {
@@ -43,10 +45,31 @@ export function fetchUploadImage(file: File, signal?: AbortSignal, onProgress?: 
   });
 }
 
-export function fetchUploadedImages(data: { current: number; size: number; name?: string }) {
-  return request<{ records: UploadedImage[]; total: number }>({
+export interface ImageSearch {
+  current: number;
+  size: number;
+  name?: string;
+  mediaType?: string | null;
+  createdAtStart?: string | null;
+  createdAtEnd?: string | null;
+}
+
+export function fetchUploadedImages(data: ImageSearch) {
+  return request<Api.Common.PaginatingQueryRecord<UploadedImage>>({
     url: '/system-manage/uploads/search',
     method: 'post',
     data
   });
+}
+
+export function fetchUploadedImage(id: string) {
+  return request<UploadedImage>({ url: `/system-manage/uploads/images/${id}` });
+}
+
+export function fetchUpdateImage(id: string, name: string) {
+  return request<UploadedImage>({ url: `/system-manage/uploads/images/${id}`, method: 'patch', data: { name } });
+}
+
+export function fetchDeleteImages(ids: string[]) {
+  return request<{ deletedCount: number }>({ url: '/system-manage/uploads/images', method: 'delete', data: { ids } });
 }

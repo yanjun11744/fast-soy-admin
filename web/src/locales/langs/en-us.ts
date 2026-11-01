@@ -1,5 +1,17 @@
 const local: App.I18n.BaseSchema = {
   imageTools: {
+    thumbnail: 'Thumbnail',
+    name: 'File name',
+    format: 'Format',
+    fileSize: 'File size',
+    dimensions: 'Dimensions',
+    uploader: 'Uploaded by',
+    uploadTime: 'Upload time',
+    updateTime: 'Updated at',
+    detail: 'Details',
+    deleteHint: 'Permanently delete the image file and record? Existing references will stop displaying this image.',
+    invalidName: 'Enter a name without path separators or control characters',
+    renameHint: 'Only the display name changes. Image URLs and existing references remain unchanged.',
     moveEarlier: 'Move image earlier',
     moveLater: 'Move image later',
     imageAlt: 'Image {index}',

@@ -9,14 +9,17 @@ from uuid import uuid4
 
 from PIL import Image, UnidentifiedImageError
 from starlette.concurrency import run_in_threadpool
+from tortoise.transactions import in_transaction
 
 from app.core.code import Code
 from app.core.config import APP_SETTINGS
-from app.core.ctx import CTX_USER_ID
+from app.core.crud import get_db_conn
+from app.core.ctx import CTX_USER, CTX_USER_ID
 from app.core.exceptions import BizError
+from app.system.models.admin import User
 from app.system.models.upload import UploadedImage, UploadSetting
 from app.system.radar.developer import radar_log
-from app.system.schemas.upload import ImageSearch, UploadSettingUpdate
+from app.system.schemas.upload import ImageSearch, ImageUpdate, UploadSettingUpdate
 
 IMAGE_FORMATS = {"JPEG": (".jpg", "image/jpeg"), "PNG": (".png", "image/png"), "GIF": (".gif", "image/gif"), "WEBP": (".webp", "image/webp")}
 IMAGE_URL_PREFIX = "/system-manage/uploads/content/"
@@ -81,7 +84,7 @@ def _inspect_image(content: bytes) -> tuple[str, str, int, int]:
 
 def _write_image(root: Path, relative: str, content: bytes) -> None:
     target = (root / relative).resolve()
-    if not target.is_relative_to(root):
+    if target == root or not target.is_relative_to(root):
         raise BizError(code=Code.UPLOAD_STORAGE_ERROR, msg="图片存储路径无效")
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("xb") as output:
@@ -125,6 +128,7 @@ async def save_image(content: bytes, name: str, setting: UploadSetting) -> dict:
 async def image_data(image: UploadedImage) -> dict:
     data = await image.to_dict(exclude_fields=["storage_root", "relative_path"])
     data["url"] = f"{IMAGE_URL_PREFIX}{image.key}"
+    data["uploader"] = image.created_by or ""
     return data
 
 
@@ -132,9 +136,97 @@ async def search_images(query: ImageSearch) -> tuple[int, list[dict]]:
     images = UploadedImage.all()
     if query.name:
         images = images.filter(name__icontains=query.name.strip())
+    if query.media_type:
+        images = images.filter(media_type=query.media_type)
+    if query.created_at_start:
+        images = images.filter(created_at__gte=query.created_at_start)
+    if query.created_at_end:
+        images = images.filter(created_at__lte=query.created_at_end)
     total = await images.count()
     records = await images.order_by("-id").offset((query.current - 1) * query.size).limit(query.size)
-    return total, [await image_data(image) for image in records]
+    data = [await image_data(image) for image in records]
+    # Earlier versions stored numeric user IDs. Resolve them in one query, without N+1 lookups.
+    user_ids = {int(image.created_by) for image in records if image.created_by and image.created_by.isdecimal()}
+    users = await User.filter(id__in=user_ids).values("id", "user_name") if user_ids else []
+    names = {str(user["id"]): user["user_name"] for user in users}
+    for item in data:
+        item["uploader"] = names.get(item["createdBy"], item["uploader"])
+    return total, data
+
+
+async def get_image(item_id: int) -> dict:
+    image = await UploadedImage.get_or_none(id=item_id)
+    if not image:
+        raise BizError(code=Code.NOT_FOUND, msg="图片不存在")
+    data = await image_data(image)
+    if image.created_by and image.created_by.isdecimal():
+        user = await User.get_or_none(id=int(image.created_by))
+        if user:
+            data["uploader"] = user.user_name
+    return data
+
+
+async def update_image(item_id: int, obj: ImageUpdate) -> dict:
+    async with in_transaction(get_db_conn(UploadedImage)):
+        image = await UploadedImage.filter(id=item_id).select_for_update().first()
+        if not image:
+            raise BizError(code=Code.NOT_FOUND, msg="图片不存在")
+        image.name = obj.name
+        user = CTX_USER.get()
+        image.updated_by = user.user_name if user else None
+        await image.save(update_fields=["name", "updated_by", "updated_at"])
+    radar_log("重命名上传图片", data={"key": image.key})
+    return await get_image(item_id)
+
+
+def _image_target(image: UploadedImage) -> Path:
+    root = Path(image.storage_root).resolve()
+    target = (root / image.relative_path).resolve()
+    if not target.is_relative_to(root):
+        raise BizError(code=Code.UPLOAD_STORAGE_ERROR, msg="图片存储路径无效")
+    return target
+
+
+def _stage_deletions(images: list[UploadedImage], staged: list[tuple[Path, Path]]) -> None:
+    for image in images:
+        target = _image_target(image)
+        if not target.exists():
+            continue  # Missing files must not prevent cleaning up stale records.
+        if not target.is_file():
+            raise BizError(code=Code.UPLOAD_STORAGE_ERROR, msg="图片存储路径不是文件")
+        backup = target.with_name(f".deleted-{uuid4().hex}")
+        target.rename(backup)
+        staged.append((target, backup))
+
+
+def _restore_deletions(staged: list[tuple[Path, Path]]) -> None:
+    for target, backup in reversed(staged):
+        backup.rename(target)
+
+
+async def delete_images(ids: list[int]) -> int:
+    ids = sorted(set(ids))
+    staged: list[tuple[Path, Path]] = []
+    try:
+        async with in_transaction(get_db_conn(UploadedImage)):
+            images = await UploadedImage.filter(id__in=ids).order_by("id").select_for_update()
+            if len(images) != len(ids):
+                raise BizError(code=Code.NOT_FOUND, msg="部分图片不存在，请刷新后重试")
+            await run_in_threadpool(_stage_deletions, images, staged)
+            await UploadedImage.filter(id__in=ids).delete()
+    except BaseException as exc:
+        await asyncio.shield(run_in_threadpool(_restore_deletions, staged))
+        if isinstance(exc, OSError):
+            raise BizError(code=Code.UPLOAD_STORAGE_ERROR, msg="图片删除失败，请检查目录权限") from exc
+        raise
+    for _, backup in staged:
+        try:
+            await run_in_threadpool(backup.unlink, missing_ok=True)
+        except OSError:
+            # The record is already committed as deleted; retain the inaccessible staging file for manual cleanup.
+            radar_log("已删除图片的暂存文件清理失败，请检查上传目录", level="ERROR")
+    radar_log("删除上传图片", data={"count": len(ids)})
+    return len(ids)
 
 
 async def get_image_path(key: str) -> tuple[Path, str]:

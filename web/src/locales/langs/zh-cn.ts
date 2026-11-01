@@ -1,5 +1,17 @@
 const local: App.I18n.BaseSchema = {
   imageTools: {
+    thumbnail: '缩略图',
+    name: '文件名称',
+    format: '图片格式',
+    fileSize: '文件大小',
+    dimensions: '图片尺寸',
+    uploader: '上传人',
+    uploadTime: '上传时间',
+    updateTime: '更新时间',
+    detail: '详情',
+    deleteHint: '删除将永久移除图片文件及记录，引用此图片的页面将无法显示原图。确认删除？',
+    invalidName: '名称不能为空，也不能包含路径分隔符或控制字符',
+    renameHint: '仅修改显示名称，图片链接和业务引用保持不变。',
     moveEarlier: '向前移动图片',
     moveLater: '向后移动图片',
     imageAlt: '图片 {index}',
