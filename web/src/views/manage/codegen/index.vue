@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import type { DataTableColumns, SelectOption } from 'naive-ui';
+import { $t } from '@/locales';
 
-type FieldType = 'text' | 'number' | 'enum' | 'relation' | 'date' | 'boolean';
+type FieldType = 'text' | 'number' | 'enum' | 'relation' | 'date' | 'boolean' | 'image';
 type ConfigMode = 'simple' | 'advanced';
 
 interface FieldConfig {
@@ -726,7 +727,7 @@ function relationFieldLabel(model: ModelConfig, lookup: RelationLookupConfig) {
 }
 
 function isExactSearchField(field: FieldConfig | undefined) {
-  return Boolean(field && field.type !== 'text');
+  return Boolean(field && field.type !== 'text' && field.type !== 'image');
 }
 
 function simpleContainsFields(model: ModelConfig) {
@@ -1230,7 +1231,12 @@ function parseFieldsFromBody(body: string) {
     if (!fieldMatch) continue;
 
     const [, rawName, fieldType, args] = fieldMatch;
-    const type = fieldTypeFromTortoise(fieldType);
+    const imageField =
+      ['CharField', 'TextField', 'JSONField'].includes(fieldType) &&
+      (/\[images?\]/i.test(extractStringValue(args, 'description') || '') ||
+        /^(?:.*_)?(?:images|photos|pictures)(?:_urls)?$/.test(rawName) ||
+        /^(?:.*_)?(?:image|photo|picture|avatar|cover|logo)(?:_url)?$/.test(rawName));
+    const type = imageField ? 'image' : fieldTypeFromTortoise(fieldType);
     const name = type === 'relation' && !rawName.endsWith('_id') ? `${rawName}_id` : rawName;
     relationIds.delete(name);
 
@@ -1258,7 +1264,7 @@ function buildModelFromSource(name: string, bases: string, body: string): ModelC
   const exactFields = fields
     .filter(
       field =>
-        field.type !== 'text' ||
+        (field.type !== 'text' && field.type !== 'image') ||
         field.name.endsWith('_id') ||
         ['status', 'category', 'type'].some(token => field.name.includes(token))
     )
@@ -1350,6 +1356,7 @@ watch(models, persistChangedModelConfigs, { deep: true });
 
 <template>
   <div class="min-h-500px flex-col-stretch gap-16px overflow-auto codegen-page">
+    <NAlert type="info">{{ $t('imageTools.sourceHint') }}</NAlert>
     <NCard :bordered="false" size="small" class="card-wrapper">
       <div class="flex flex-wrap items-start justify-between gap-16px">
         <div class="max-w-760px">

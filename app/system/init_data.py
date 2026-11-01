@@ -144,6 +144,18 @@ SYSTEM_INIT_DATA = {
                     "icon": "mdi:code-json",
                 },
                 {
+                    "menu_name": "上传管理",
+                    "route_name": "manage_upload",
+                    "route_path": "/manage/upload",
+                    "component": "view.manage_upload",
+                    "order": 6,
+                    "icon": "mdi:image-multiple-outline",
+                    "buttons": [
+                        {"button_code": "B_SYSTEM_UPLOAD_CREATE", "button_desc": "上传图片"},
+                        {"button_code": "B_SYSTEM_UPLOAD_CONFIG", "button_desc": "配置上传目录"},
+                    ],
+                },
+                {
                     "menu_name": "用户详情",
                     "route_name": "manage_user-detail",
                     "route_path": "/manage/user-detail/:id",
@@ -227,6 +239,7 @@ SYSTEM_INIT_DATA = {
                 "manage_menu",
                 "manage_api",
                 "manage_codegen",
+                "manage_upload",
                 "manage_radar",
                 "manage_radar_overview",
                 "manage_radar_requests",
@@ -234,8 +247,11 @@ SYSTEM_INIT_DATA = {
                 "manage_radar_exceptions",
                 "manage_radar_monitor",
             ],
-            "buttons": [],
+            "buttons": ["B_SYSTEM_UPLOAD_CREATE", "B_SYSTEM_UPLOAD_CONFIG"],
             "apis": [
+                ("get", "/api/v1/system-manage/uploads/settings"),
+                ("patch", "/api/v1/system-manage/uploads/settings"),
+                ("post", "/api/v1/system-manage/uploads/search"),
                 # 用户
                 *_crud_apis("users"),
                 ("post", "/api/v1/system-manage/users/{user_id}/offline"),

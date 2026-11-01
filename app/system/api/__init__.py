@@ -8,9 +8,11 @@ from .dictionary import router as dictionary_router
 from .menus import router as menu_router
 from .roles import router as role_router
 from .route import router as route_router
+from .upload import router as upload_router
 from .users import router as user_router
 
 system_router = APIRouter()
+system_router.include_router(upload_router, prefix="/system-manage", tags=["图片上传"])
 
 system_router.include_router(auth_router, prefix="/auth", tags=["权限认证"])
 system_router.include_router(route_router, prefix="/route", tags=["路由管理"])

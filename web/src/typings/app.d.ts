@@ -327,6 +327,26 @@ declare namespace App {
     };
 
     type Schema = {
+      imageTools: {
+        imageAlt: string;
+        add: string;
+        invalid: string;
+        limit: string;
+        tip: string;
+        settings: string;
+        directory: string;
+        directoryHint: string;
+        maxSize: string;
+        library: string;
+        search: string;
+        empty: string;
+        copy: string;
+        copied: string;
+        copyFailed: string;
+        sourceHint: string;
+        moveEarlier: string;
+        moveLater: string;
+      };
       system: {
         title: string;
         updateTitle: string;

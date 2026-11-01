@@ -76,6 +76,9 @@ class Code:
     OLD_PASSWORD_WRONG = "2405"  # 修改密码时原密码错误
     TARGET_USER_NOT_FOUND = "2406"  # 操作目标用户不存在（模拟登录等）
     STATE_TRANSITION_INVALID = "2407"  # 不允许的状态流转
+    UPLOAD_INVALID_IMAGE = "2408"  # 图片内容无效
+    UPLOAD_TOO_LARGE = "2409"  # 上传大小超限
+    UPLOAD_STORAGE_ERROR = "2410"  # 本地存储不可用
 
     # 25xx — 限流/安全
     RATE_LIMITED = "2500"  # 请求过于频繁
