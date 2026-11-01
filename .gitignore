@@ -88,3 +88,8 @@ app_system_e2e.sqlite3*
 tmp/
 codegen_backups/
 skills-lock.json
+
+# macOS
+.DS_Store
+._*
+__MACOSX/
