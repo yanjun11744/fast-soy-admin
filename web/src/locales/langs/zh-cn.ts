@@ -22,6 +22,8 @@ const local: App.I18n.BaseSchema = {
     excelConfirmImport: '确认导入',
     excelImport: '导入 Excel',
     excelExport: '导出 Excel',
+    excelExportFiltered: '导出筛选结果',
+    excelExportSelected: '导出所选（{count} 条）',
     excelTemplate: '下载导入模板',
     excelFileLimit: '仅支持 5MB 以内的 .xlsx 文件',
     excelImportSuccess: '成功导入 {count} 条数据',

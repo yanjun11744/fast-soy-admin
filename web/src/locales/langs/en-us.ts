@@ -22,6 +22,8 @@ const local: App.I18n.BaseSchema = {
     excelConfirmImport: 'Confirm import',
     excelImport: 'Import Excel',
     excelExport: 'Export Excel',
+    excelExportFiltered: 'Export filtered results',
+    excelExportSelected: 'Export selected ({count})',
     excelTemplate: 'Download import template',
     excelFileLimit: 'Upload an .xlsx file no larger than 5MB',
     excelImportSuccess: 'Imported {count} records',
