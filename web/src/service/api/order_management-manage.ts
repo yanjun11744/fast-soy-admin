@@ -50,7 +50,7 @@ export function fetchBatchDeleteOrder(data?: Api.OrderManagementManage.CommonBat
 }
 
 
-export function fetchExportOrder(data?: Api.OrderManagementManage.OrderSearchParams) {
+export function fetchExportOrder(data?: Api.OrderManagementManage.OrderSearchParams & { ids?: string[] }) {
   return request<ExcelDownload>({ url: '/business/order_management/orders/export', method: 'post', data: data ?? {} });
 }
 

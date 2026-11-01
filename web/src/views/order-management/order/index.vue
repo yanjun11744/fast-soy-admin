@@ -116,6 +116,8 @@ function edit(id: string) {
             :import-api="fetchImportOrder"
             :preview-api="fetchPreviewImportOrder"
             :export-api="() => fetchExportOrder(searchParams)"
+            :export-selected-api="ids => fetchExportOrder({ ...searchParams, ids })"
+            :selected-ids="checkedRowKeys"
             :template-api="fetchOrderImportTemplate"
             
             @imported="getDataByPage(1)"
