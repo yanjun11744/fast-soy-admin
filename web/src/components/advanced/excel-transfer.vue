@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 import type { UploadCustomRequestOptions } from 'naive-ui';
 import { downloadExcel } from '@/utils/excel';
 import type { ExcelDownload, ExcelImportApi, ExcelPreviewApi } from '@/utils/excel';
@@ -12,21 +12,44 @@ interface Props {
   importApi: ExcelImportApi;
   previewApi?: ExcelPreviewApi;
   exportApi: () => Result<ExcelDownload>;
+  exportSelectedApi?: (ids: string[]) => Result<ExcelDownload>;
+  selectedIds?: string[];
   templateApi: () => Result<ExcelDownload>;
   canImport?: boolean;
   canExport?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), { canImport: true, canExport: true, previewApi: undefined });
+const props = withDefaults(defineProps<Props>(), {
+  canImport: true,
+  canExport: true,
+  previewApi: undefined,
+  exportSelectedApi: undefined,
+  selectedIds: () => []
+});
 const emit = defineEmits<{ imported: [] }>();
 const busy = ref(false);
 const selectedFile = shallowRef<File | null>(null);
+const exportOptions = computed(() => [
+  { label: $t('common.excelExportFiltered'), key: 'filtered' },
+  {
+    label: $t('common.excelExportSelected', { count: props.selectedIds.length }),
+    key: 'selected',
+    disabled: props.selectedIds.length === 0
+  }
+]);
 
-async function download(template = false) {
+async function download(template = false, selected = false) {
   if (busy.value || selectedFile.value) return;
+  if (selected && (!props.exportSelectedApi || props.selectedIds.length === 0)) return;
   busy.value = true;
   try {
-    const { data, error } = await (template ? props.templateApi() : props.exportApi());
+    const result =
+      selected && props.exportSelectedApi
+        ? props.exportSelectedApi([...props.selectedIds])
+        : template
+          ? props.templateApi()
+          : props.exportApi();
+    const { data, error } = await result;
     if (!error && data) downloadExcel(data);
   } finally {
     busy.value = false;
@@ -83,8 +106,19 @@ async function upload(options: UploadCustomRequestOptions) {
         {{ $t('common.excelImport') }}
       </NButton>
     </NUpload>
+    <NDropdown
+      v-if="canExport && exportSelectedApi"
+      trigger="click"
+      :options="exportOptions"
+      :disabled="busy || Boolean(selectedFile)"
+      @select="key => download(false, key === 'selected')"
+    >
+      <NButton size="small" :loading="busy" :disabled="busy || Boolean(selectedFile)">
+        {{ $t('common.excelExport') }} ▾
+      </NButton>
+    </NDropdown>
     <NButton
-      v-if="canExport"
+      v-else-if="canExport"
       size="small"
       :loading="busy"
       :disabled="busy || Boolean(selectedFile)"

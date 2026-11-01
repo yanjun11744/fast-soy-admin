@@ -349,6 +349,8 @@ declare namespace App {
         excelConfirmImport: string;
         excelImport: string;
         excelExport: string;
+        excelExportFiltered: string;
+        excelExportSelected: string;
         excelTemplate: string;
         excelFileLimit: string;
         excelImportSuccess: string;

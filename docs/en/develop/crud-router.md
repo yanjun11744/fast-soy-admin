@@ -233,6 +233,10 @@ The module's `api/__init__.py` must export `router: APIRouter` for autodiscover 
 
 ## Excel titles, exact aliases and import preview
 
+`POST /customers/export` accepts the list search fields plus optional `ids: SqidId[]`. Omitted or `null` IDs export all matching records. An array exports the intersection of selected IDs, search filters, `data_policy` and `excel_scope_filter`, preserving list order and ignoring pagination. Empty arrays, invalid IDs and arrays exceeding 10000 IDs are rejected; duplicate IDs do not duplicate rows. Deleted or inaccessible records are excluded.
+
+Generated pages provide an export dropdown with “Export filtered results” and “Export selected (N)”; selection export is disabled when nothing is checked. Existing pages can pass `:selected-ids="checkedRowKeys"` and `:export-selected-api="ids => fetchExportCustomer({ ...searchParams, ids })"` to `ExcelTransfer`, and extend the service parameter type to `SearchParams & { ids?: string[] }`. Without `export-selected-api`, the original single export button remains. Selection follows the table's existing behavior; no cross-page select-all is added.
+
 Enable Excel for simple resources with `excel=ExcelConfig(fields=("name", "phone"))`. Templates and exports use `ExcelColumn.title`, then the create Schema's `Field(title=...)`, then the field name. Original field names remain accepted on import.
 
 ```python
