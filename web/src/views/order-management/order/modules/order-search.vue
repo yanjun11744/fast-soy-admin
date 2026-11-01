@@ -47,7 +47,7 @@ function search() {
   <NCard :bordered="false" size="small" class="card-wrapper">
     <NCollapse :default-expanded-names="['order-search']">
       <NCollapseItem :title="$t('common.search')" name="order-search">
-        <NForm :model="model" label-placement="left" :label-width="80">
+        <NForm :model="model" label-placement="left" :label-width="80" @submit.prevent="search">
           <NGrid responsive="screen" item-responsive>
             <NFormItemGi span="24 s:12 m:6" :label="$t('page.order_management.order.orderNo')" path="orderNo" class="pr-24px">
               <NInput v-model:value="model.orderNo" :placeholder="$t('page.order_management.order.form.orderNo')" />
@@ -73,7 +73,7 @@ function search() {
                   <template #icon><icon-ic-round-refresh class="text-icon" /></template>
                   {{ $t('common.reset') }}
                 </NButton>
-                <NButton type="primary" ghost @click="search">
+                <NButton type="primary" attr-type="submit" ghost>
                   <template #icon><icon-ic-round-search class="text-icon" /></template>
                   {{ $t('common.search') }}
                 </NButton>
