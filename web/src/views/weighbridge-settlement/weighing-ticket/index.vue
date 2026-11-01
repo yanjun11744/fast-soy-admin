@@ -1,15 +1,15 @@
 <script setup lang="tsx">
-import { reactive, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 import { NButton, NPopconfirm } from 'naive-ui';
-import ExcelTransfer from '@/components/advanced/excel-transfer.vue';
 import {
   fetchBatchDeleteWeighingTicket, fetchDeleteWeighingTicket, fetchGetWeighingTicketList,
-  fetchExportWeighingTicket, fetchImportWeighingTicket, fetchPreviewImportWeighingTicket, fetchWeighingTicketImportTemplate
+  fetchExportWeighingTicket, fetchSettlementRateOptions, fetchSettleWeighingTicket
 } from '@/service/api';
 import { useAppStore } from '@/store/modules/app';
 import { defaultTransform, useNaivePaginatedTable, useTableOperate } from '@/hooks/common/table';
 
 import { $t } from '@/locales';
+import { downloadExcel } from '@/utils/excel';
 import WeighingTicketOperateDrawer from './modules/weighing-ticket-operate-drawer.vue';
 import WeighingTicketSearch from './modules/weighing-ticket-search.vue';
 
@@ -20,9 +20,11 @@ type SelectOptionItem = { label: string; value: string | number };
 
 const rateOptions = ref<SelectOptionItem[]>([]);
 
-// TODO: 在这里加载真实 options 数据源，并传给搜索区和抽屉。
-
-
+const detailMode = ref(false);
+onMounted(async () => {
+  const { data: options } = await fetchSettlementRateOptions();
+  rateOptions.value = (options ?? []).map(rate => ({ label: rate.processName, value: rate.id }));
+});
 const defaultSearchParams: Api.WeighbridgeSettlementManage.WeighingTicketSearchParams = {
   current: 1,
   size: 10,
@@ -52,22 +54,24 @@ const { columns, columnChecks, data, loading, getData, getDataByPage, mobilePagi
     { key: 'process', title: $t('page.weighbridge_settlement.weighing_ticket.process'), align: 'center', minWidth: 120 },
     { key: 'price', title: $t('page.weighbridge_settlement.weighing_ticket.price'), align: 'center', minWidth: 120 },
     { key: 'totalAmount', title: $t('page.weighbridge_settlement.weighing_ticket.totalAmount'), align: 'center', minWidth: 120 },
-    { key: 'rateId', title: $t('page.weighbridge_settlement.weighing_ticket.rate'), align: 'center', minWidth: 120 },
+    { key: 'isSettled', title: $t('page.weighbridge_settlement.weighing_ticket.isSettled'), align: 'center', minWidth: 100, render: row => row.isSettled ? $t('page.weighbridge_settlement.settlement.settled') : $t('page.weighbridge_settlement.settlement.unsettled') },
     {
       key: 'operate',
       title: $t('common.operate'),
       align: 'center',
-      width: 130,
+      width: 340,
       render: row => (
         <div class="flex-center gap-8px">
-          <NButton type="primary" ghost size="small" onClick={() => edit(row.id)}>
+          <NButton size="small" onClick={() => showDetail(row.id)}>{$t('page.weighbridge_settlement.settlement.details')}</NButton>
+          {!row.isSettled && <NPopconfirm onPositiveClick={() => settle(row)}>{{ default: () => $t('page.weighbridge_settlement.settlement.settleConfirm'), trigger: () => <NButton size="small" type="success">{$t('page.weighbridge_settlement.settlement.settle')}</NButton> }}</NPopconfirm>}
+          <NButton disabled={Boolean(row.isSettled)} type="primary" ghost size="small" onClick={() => edit(row.id)}>
               {$t('common.edit')}
             </NButton>
           <NPopconfirm onPositiveClick={() => handleDelete(row.id)}>
               {{
                 default: () => $t('common.confirmDelete'),
                 trigger: () => (
-                  <NButton type="error" ghost size="small">
+                  <NButton disabled={Boolean(row.isSettled)} type="error" ghost size="small">
                     {$t('common.delete')}
                   </NButton>
                 )
@@ -81,6 +85,30 @@ const { columns, columnChecks, data, loading, getData, getDataByPage, mobilePagi
 
 const { drawerVisible, operateType, editingData, handleAdd, handleEdit, checkedRowKeys, onBatchDeleted, onDeleted } =
   useTableOperate(data, 'id', getData);
+
+async function settle(row: Api.WeighbridgeSettlementManage.WeighingTicket) {
+  const { error } = await fetchSettleWeighingTicket(row.id, row.revision ?? 1);
+  if (!error) getData();
+}
+function showDetail(id: string) {
+  detailMode.value = true;
+  handleEdit(id);
+}
+function add() {
+  detailMode.value = false;
+  handleAdd();
+}
+
+
+const exporting = ref(false);
+async function exportTickets(selected = false) {
+  if (exporting.value || (selected && !checkedRowKeys.value.length)) return;
+  exporting.value = true;
+  try {
+    const { data: file, error } = await fetchExportWeighingTicket({ ...searchParams, ...(selected ? { ids: checkedRowKeys.value as string[] } : {}) });
+    if (!error && file) downloadExcel(file);
+  } finally { exporting.value = false; }
+}
 
 async function handleBatchDelete() {
   const { error } = await fetchBatchDeleteWeighingTicket({ ids: checkedRowKeys.value as string[] });
@@ -100,6 +128,7 @@ function resetSearchParams() {
 }
 
 function edit(id: string) {
+  detailMode.value = false;
   handleEdit(id);
 }
 </script>
@@ -112,24 +141,25 @@ function edit(id: string) {
       @reset="resetSearchParams"
       @search="getDataByPage"
     />
-    <NCard :title="$t('page.weighbridge_settlement.weighing_ticket.pageTitle')" :bordered="false" size="small" class="card-wrapper sm:flex-1-hidden">
+    <NCard
+      :title="$t('page.weighbridge_settlement.weighing_ticket.pageTitle')"
+      :bordered="false"
+      size="small"
+      class="card-wrapper sm:flex-1-hidden"
+    >
       <template #header-extra>
         <NSpace align="center" wrap>
-          <ExcelTransfer
-            :import-api="fetchImportWeighingTicket"
-            :preview-api="fetchPreviewImportWeighingTicket"
-            :export-api="() => fetchExportWeighingTicket(searchParams)"
-            :export-selected-api="ids => fetchExportWeighingTicket({ ...searchParams, ids })"
-            :selected-ids="checkedRowKeys"
-            :template-api="fetchWeighingTicketImportTemplate"
-            
-            @imported="getDataByPage(1)"
-          />
+          <NButton size="small" :loading="exporting" @click="exportTickets()">
+            {{ $t('common.excelExportFiltered') }}
+          </NButton>
+          <NButton size="small" :disabled="!checkedRowKeys.length || exporting" @click="exportTickets(true)">
+            {{ $t('common.excelExportSelected', { count: checkedRowKeys.length }) }}
+          </NButton>
           <TableHeaderOperation
             v-model:columns="columnChecks"
             :disabled-delete="checkedRowKeys.length === 0"
             :loading="loading"
-            @add="handleAdd"
+            @add="add"
             @delete="handleBatchDelete"
             @refresh="getData"
           />
@@ -141,7 +171,7 @@ function edit(id: string) {
         :data="data"
         size="small"
         :flex-height="!appStore.isMobile"
-        :scroll-x="600"
+        :scroll-x="1400"
         :loading="loading"
         remote
         :row-key="row => row.id"
@@ -152,7 +182,7 @@ function edit(id: string) {
         v-model:visible="drawerVisible"
         :operate-type="operateType"
         :row-data="editingData"
-        :rate-options="rateOptions"
+        :readonly="detailMode"
         @submitted="getDataByPage"
       />
     </NCard>

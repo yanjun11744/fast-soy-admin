@@ -5,7 +5,6 @@ import { fetchAddSettlementRate, fetchUpdateSettlementRate } from '@/service/api
 import { useFormRules, useNaiveForm } from '@/hooks/common/form';
 import { $t } from '@/locales';
 
-
 defineOptions({ name: 'SettlementRateOperateDrawer' });
 
 interface Props {
@@ -38,7 +37,7 @@ function createDefaultModel(): Api.WeighbridgeSettlementManage.SettlementRateAdd
   return {
     processName: '',
     price: null,
-    enabled: false
+    enabled: true
   } as unknown as Api.WeighbridgeSettlementManage.SettlementRateAddParams;
 }
 
@@ -46,7 +45,6 @@ const rules: Record<string, App.Global.FormRule> = {
   processName: defaultRequiredRule,
   price: defaultRequiredRule
 };
-
 
 function handleInitModel() {
   model.value = createDefaultModel();
@@ -87,16 +85,22 @@ watch(visible, () => {
     <NDrawerContent :title="title" :native-scrollbar="false" closable>
       <NForm ref="formRef" :model="model" :rules="rules">
         <NFormItem :label="$t('page.weighbridge_settlement.settlement_rate.processName')" path="processName">
-          <NInput v-model:value="model.processName" :placeholder="$t('page.weighbridge_settlement.settlement_rate.form.processName')" />
+          <NInput
+            v-model:value="model.processName"
+            :placeholder="$t('page.weighbridge_settlement.settlement_rate.form.processName')"
+          />
         </NFormItem>
         <NFormItem :label="$t('page.weighbridge_settlement.settlement_rate.price')" path="price">
-          <NInputNumber v-model:value="model.price" :precision="2" :placeholder="$t('page.weighbridge_settlement.settlement_rate.form.price')" class="w-full" />
+          <NInputNumber
+            v-model:value="model.price"
+            :precision="4"
+            :min="0.0001"
+            :placeholder="$t('page.weighbridge_settlement.settlement_rate.form.price')"
+            class="w-full"
+          />
         </NFormItem>
         <NFormItem :label="$t('page.weighbridge_settlement.settlement_rate.enabled')" path="enabled">
-          <NSwitch
-            :value="Boolean(model.enabled)"
-            @update:value="value => (model.enabled = value)"
-          />
+          <NSwitch :value="Boolean(model.enabled)" @update:value="value => (model.enabled = value)" />
         </NFormItem>
       </NForm>
       <template #footer>

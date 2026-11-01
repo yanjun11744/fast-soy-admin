@@ -5,6 +5,36 @@ declare global {
   namespace App.I18n {
     interface GeneratedPages {
       weighbridge_settlement: {
+        settlement: {
+          details: string;
+          lines: string;
+          partNo: string;
+          orderNo: string;
+          name: string;
+          unitWeight: string;
+          quantity: string;
+          theoreticalWeight: string;
+          allocatedWeight: string;
+          amount: string;
+          taxUnitPrice: string;
+          source: string;
+          matched: string;
+          manual: string;
+          searchOrders: string;
+          addLine: string;
+          settle: string;
+          settleConfirm: string;
+          settled: string;
+          unsettled: string;
+          preview: string;
+          totalTheoreticalWeight: string;
+          refreshPrice: string;
+          requiredLines: string;
+          previewFailed: string;
+          loadFailed: string;
+          noOrders: string;
+          retry: string;
+        };
         common: {
           status: string;
           form: { status: string };

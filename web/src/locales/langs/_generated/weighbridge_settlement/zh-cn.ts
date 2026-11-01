@@ -6,10 +6,40 @@ export default {
   route: {
     'weighbridge-settlement': '磅单结算',
     'weighbridge-settlement_settlement-rate': '工序招采价格',
-    'weighbridge-settlement_weighing-ticket': '磅单信息',
+    'weighbridge-settlement_weighing-ticket': '磅单信息'
   },
   page: {
     weighbridge_settlement: {
+      settlement: {
+        details: '查看详情',
+        lines: '关联订单明细',
+        partNo: '项目号',
+        orderNo: '订单号（选填）',
+        name: '名称',
+        unitWeight: '机内单重/kg',
+        quantity: '本次实际数量',
+        theoreticalWeight: '理论重量/kg',
+        allocatedWeight: '分摊实际重量/kg',
+        amount: '含税结算金额/元',
+        taxUnitPrice: '每件含税单价',
+        source: '录入来源',
+        matched: '匹配订单',
+        manual: '手动录入',
+        searchOrders: '输入项目号搜索，选择具体订单',
+        addLine: '添加明细',
+        settle: '确认结算',
+        settleConfirm: '结算后不可编辑或删除，确认继续？',
+        settled: '已结算',
+        unsettled: '未结算',
+        preview: '试算结果（以保存结果为准）',
+        totalTheoreticalWeight: '理论重量合计/kg',
+        refreshPrice: '使用当前工序最新价格',
+        requiredLines: '请填写完整磅单及至少一条有效明细',
+        previewFailed: '试算失败，请检查输入后重试',
+        loadFailed: '加载失败，请关闭后重新打开',
+        noOrders: '无匹配订单，可选择手动录入',
+        retry: '重试试算'
+      },
       common: { status: '状态', form: { status: '请选择状态' } },
       settlement_rate: {
         pageTitle: '工序招采价格',
@@ -19,7 +49,7 @@ export default {
         form: {
           processName: '请输入工序名称',
           price: '请输入含税招采价格（元/kg）',
-          enabled: '请输入是否启用',
+          enabled: '请输入是否启用'
         },
         addSettlementRate: '新增工序招采价格',
         editSettlementRate: '编辑工序招采价格'
@@ -44,11 +74,11 @@ export default {
           totalAmount: '请输入含税总金额/元',
           isSettled: '请输入是否已结算',
           revision: '请输入修订版本',
-          rate: '请选择工序招采价格',
+          rate: '请选择工序招采价格'
         },
         addWeighingTicket: '新增磅单信息',
         editWeighingTicket: '编辑磅单信息'
-      },
-    },
-  },
+      }
+    }
+  }
 };

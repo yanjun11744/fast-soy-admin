@@ -41,19 +41,40 @@ declare namespace Api {
       rateId: string;
     }>;
 
+    type LineInput = {
+      id?: string;
+      orderId: string | null;
+      orderNo: string | null;
+      partNo: string;
+      name: string;
+      unitWeight: string;
+      quantity: number;
+    };
+    type WeighingLine = LineInput & {
+      position: number;
+      theoreticalWeight: string;
+      allocatedWeight: string;
+      amount: string;
+      taxUnitPrice: string;
+    };
+    type TicketDetail = Omit<WeighingTicket, 'weight' | 'price' | 'totalAmount' | 'revision'> & {
+      weight: string;
+      price: string;
+      totalAmount: string;
+      revision: number;
+      lines: WeighingLine[];
+    };
+    type RateOption = { id: string; processName: string; price: string };
+    type OrderOption = { id: string; partNo: string; orderNo: string; name: string; unitWeight: string };
+    type Preview = { totalAmount: string; lines: WeighingLine[] };
     type WeighingTicketAddParams = {
       ticketNo: string;
       weighingDate: string;
-      weight: number;
-      process: string;
-      price: number;
-      totalAmount: number;
-      isSettled?: boolean | null;
-      revision?: number | null;
-      rateId: string;
+      weight: string;
+      rateId?: string;
+      lines: LineInput[];
     };
-
-    type WeighingTicketUpdateParams = { id?: string } & Partial<WeighingTicketAddParams>;
+    type WeighingTicketUpdateParams = WeighingTicketAddParams & { id?: string; revision: number };
 
     type WeighingTicketSearchParams = CommonType.RecordNullable<
       {
@@ -67,6 +88,5 @@ declare namespace Api {
     >;
 
     type WeighingTicketList = Common.PaginatingQueryRecord<WeighingTicket>;
-
   }
 }

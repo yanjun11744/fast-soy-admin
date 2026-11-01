@@ -49,9 +49,14 @@ export function fetchBatchDeleteSettlementRate(data?: Api.WeighbridgeSettlementM
   });
 }
 
-
-export function fetchExportSettlementRate(data?: Api.WeighbridgeSettlementManage.SettlementRateSearchParams & { ids?: string[] }) {
-  return request<ExcelDownload>({ url: '/business/weighbridge_settlement/settlement_rates/export', method: 'post', data: data ?? {} });
+export function fetchExportSettlementRate(
+  data?: Api.WeighbridgeSettlementManage.SettlementRateSearchParams & { ids?: string[] }
+) {
+  return request<ExcelDownload>({
+    url: '/business/weighbridge_settlement/settlement_rates/export',
+    method: 'post',
+    data: data ?? {}
+  });
 }
 
 export function fetchSettlementRateImportTemplate() {
@@ -60,12 +65,24 @@ export function fetchSettlementRateImportTemplate() {
 
 export function fetchPreviewImportSettlementRate(file: File, options?: ExcelImportOptions) {
   const data = createExcelFormData(file, options);
-  return request<ExcelPreview>({ url: '/business/weighbridge_settlement/settlement_rates/import-preview', method: 'post', data, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 });
+  return request<ExcelPreview>({
+    url: '/business/weighbridge_settlement/settlement_rates/import-preview',
+    method: 'post',
+    data,
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000
+  });
 }
 
 export function fetchImportSettlementRate(file: File, options?: ExcelImportOptions) {
   const data = createExcelFormData(file, options);
-  return request<{ importedCount: number }>({ url: '/business/weighbridge_settlement/settlement_rates/import', method: 'post', data, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 });
+  return request<{ importedCount: number }>({
+    url: '/business/weighbridge_settlement/settlement_rates/import',
+    method: 'post',
+    data,
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000
+  });
 }
 
 // ---- WeighingTicket ----
@@ -78,25 +95,26 @@ export function fetchGetWeighingTicketList(data?: Api.WeighbridgeSettlementManag
 }
 
 export function fetchGetWeighingTicket(id: string) {
-  return request<Api.WeighbridgeSettlementManage.WeighingTicket>({
+  return request<Api.WeighbridgeSettlementManage.TicketDetail>({
     url: `/business/weighbridge_settlement/weighing_tickets/${id}`,
     method: 'get'
   });
 }
 
 export function fetchAddWeighingTicket(data?: Api.WeighbridgeSettlementManage.WeighingTicketAddParams) {
-  return request<null, 'json'>({
+  return request<Api.WeighbridgeSettlementManage.TicketDetail, 'json'>({
     url: '/business/weighbridge_settlement/weighing_tickets',
     method: 'post',
     data
   });
 }
 
-export function fetchUpdateWeighingTicket(data?: Api.WeighbridgeSettlementManage.WeighingTicketUpdateParams) {
-  return request<null, 'json'>({
-    url: `/business/weighbridge_settlement/weighing_tickets/${data?.id}`,
+export function fetchUpdateWeighingTicket(data: Api.WeighbridgeSettlementManage.WeighingTicketUpdateParams) {
+  const { id, ...payload } = data;
+  return request<Api.WeighbridgeSettlementManage.TicketDetail, 'json'>({
+    url: `/business/weighbridge_settlement/weighing_tickets/${id}`,
     method: 'patch',
-    data
+    data: payload
   });
 }
 
@@ -115,22 +133,46 @@ export function fetchBatchDeleteWeighingTicket(data?: Api.WeighbridgeSettlementM
   });
 }
 
-
-export function fetchExportWeighingTicket(data?: Api.WeighbridgeSettlementManage.WeighingTicketSearchParams & { ids?: string[] }) {
-  return request<ExcelDownload>({ url: '/business/weighbridge_settlement/weighing_tickets/export', method: 'post', data: data ?? {} });
+export function fetchSettlementRateOptions() {
+  return request<Api.WeighbridgeSettlementManage.RateOption[]>({
+    url: '/business/weighbridge_settlement/settlement_rates/options'
+  });
 }
 
-export function fetchWeighingTicketImportTemplate() {
-  return request<ExcelDownload>({ url: '/business/weighbridge_settlement/weighing_tickets/import-template' });
+export function fetchSettlementOrderOptions(partNo: string) {
+  return request<Api.WeighbridgeSettlementManage.OrderOption[]>({
+    url: '/business/weighbridge_settlement/weighing_tickets/order-options',
+    method: 'post',
+    data: { partNo, limit: 20 }
+  });
 }
 
-export function fetchPreviewImportWeighingTicket(file: File, options?: ExcelImportOptions) {
-  const data = createExcelFormData(file, options);
-  return request<ExcelPreview>({ url: '/business/weighbridge_settlement/weighing_tickets/import-preview', method: 'post', data, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 });
+export function fetchSettlementPreview(data: {
+  weight: string;
+  price: string;
+  lines: Api.WeighbridgeSettlementManage.LineInput[];
+}) {
+  return request<Api.WeighbridgeSettlementManage.Preview>({
+    url: '/business/weighbridge_settlement/weighing_tickets/preview',
+    method: 'post',
+    data
+  });
 }
 
-export function fetchImportWeighingTicket(file: File, options?: ExcelImportOptions) {
-  const data = createExcelFormData(file, options);
-  return request<{ importedCount: number }>({ url: '/business/weighbridge_settlement/weighing_tickets/import', method: 'post', data, headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 });
+export function fetchSettleWeighingTicket(id: string, revision: number) {
+  return request<Api.WeighbridgeSettlementManage.TicketDetail>({
+    url: `/business/weighbridge_settlement/weighing_tickets/${id}/settle`,
+    method: 'post',
+    data: { revision }
+  });
 }
 
+export function fetchExportWeighingTicket(
+  data?: Api.WeighbridgeSettlementManage.WeighingTicketSearchParams & { ids?: string[] }
+) {
+  return request<ExcelDownload>({
+    url: '/business/weighbridge_settlement/weighing_tickets/export',
+    method: 'post',
+    data: data ?? {}
+  });
+}

@@ -5,10 +5,40 @@ export default {
   route: {
     'weighbridge-settlement': 'WeighbridgeSettlement',
     'weighbridge-settlement_settlement-rate': 'Settlement Rate',
-    'weighbridge-settlement_weighing-ticket': 'Weighing Ticket',
+    'weighbridge-settlement_weighing-ticket': 'Weighing Ticket'
   },
   page: {
     weighbridge_settlement: {
+      settlement: {
+        details: 'Details',
+        lines: 'Order lines',
+        partNo: 'Part number',
+        orderNo: 'Order number (optional)',
+        name: 'Name',
+        unitWeight: 'Unit weight/kg',
+        quantity: 'Actual quantity',
+        theoreticalWeight: 'Theoretical weight/kg',
+        allocatedWeight: 'Allocated weight/kg',
+        amount: 'Amount incl. tax',
+        taxUnitPrice: 'Unit price incl. tax',
+        source: 'Source',
+        matched: 'Matched order',
+        manual: 'Manual entry',
+        searchOrders: 'Search part number and select an order',
+        addLine: 'Add line',
+        settle: 'Confirm settlement',
+        settleConfirm: 'Settlement locks this ticket. Continue?',
+        settled: 'Settled',
+        unsettled: 'Unsettled',
+        preview: 'Preview (recalculated on save)',
+        totalTheoreticalWeight: 'Total theoretical weight/kg',
+        refreshPrice: 'Use current process price',
+        requiredLines: 'Complete the ticket and at least one valid line',
+        previewFailed: 'Preview failed. Check input and retry',
+        loadFailed: 'Loading failed. Close and reopen',
+        noOrders: 'No matches. Choose manual entry',
+        retry: 'Retry preview'
+      },
       common: { status: 'Status', form: { status: 'Please select status' } },
       settlement_rate: {
         pageTitle: 'Settlement Rate',
@@ -18,7 +48,7 @@ export default {
         form: {
           processName: 'Please input processName',
           price: 'Please input price',
-          enabled: 'Please input enabled',
+          enabled: 'Please input enabled'
         },
         addSettlementRate: 'Add Settlement Rate',
         editSettlementRate: 'Edit Settlement Rate'
@@ -43,11 +73,11 @@ export default {
           totalAmount: 'Please input totalAmount',
           isSettled: 'Please input isSettled',
           revision: 'Please input revision',
-          rate: 'Please select rate',
+          rate: 'Please select rate'
         },
         addWeighingTicket: 'Add Weighing Ticket',
         editWeighingTicket: 'Edit Weighing Ticket'
-      },
-    },
-  },
+      }
+    }
+  }
 };

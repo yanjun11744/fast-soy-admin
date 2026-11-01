@@ -144,10 +144,11 @@ class WeighingLine(BaseModel, AuditMixin):
     )
 
     # 关联订单资料
-    order_id: int
+    order_id: int | None
 
-    order: fields.ForeignKeyRelation[Model] = fields.ForeignKeyField(
+    order: fields.ForeignKeyNullableRelation[Model] = fields.ForeignKeyField(
         "app_system.Order",
+        null=True,
         related_name="weighing_lines",
         on_delete=fields.RESTRICT,
         description="关联订单",
@@ -160,6 +161,7 @@ class WeighingLine(BaseModel, AuditMixin):
     # 订单资料快照
     order_no = fields.CharField(
         max_length=100,
+        null=True,
         description="订单号快照",
     )
 
