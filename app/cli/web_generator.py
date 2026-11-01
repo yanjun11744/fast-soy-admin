@@ -204,7 +204,7 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
             "}",
             "",
             "",
-            f"export function fetchExport{entity}(data?: Api.{ns}.{entity}SearchParams) {{",
+            f"export function fetchExport{entity}(data?: Api.{ns}.{entity}SearchParams & {{ ids?: string[] }}) {{",
             f"  return request<ExcelDownload>({{ url: '{url_base}/export', method: 'post', data: data ?? {{}} }});",
             "}",
             "",
@@ -693,6 +693,8 @@ function edit(id: string) {{
             :import-api="fetchImport{entity}"
             :preview-api="fetchPreviewImport{entity}"
             :export-api="() => fetchExport{entity}(searchParams)"
+            :export-selected-api="ids => fetchExport{entity}({{ ...searchParams, ids }})"
+            :selected-ids="checkedRowKeys"
             :template-api="fetch{entity}ImportTemplate"
             {excel_auth}
             @imported="getDataByPage(1)"

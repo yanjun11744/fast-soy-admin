@@ -305,9 +305,23 @@ crud = CRUDRouter(
 | `GET /customers/import-template` | 下载只有字段表头的模板 |
 | `POST /customers/import-preview` | 只读识别、字段映射和整表校验，不写入数据库 |
 | `POST /customers/import` | multipart 上传，字段名为 `file`；提交时重新校验 |
-| `POST /customers/export` | 使用列表搜索 Schema 筛选，导出全部匹配记录，忽略当前页码和每页数量 |
+| `POST /customers/export` | 使用列表搜索条件筛选；可附加 `ids` 导出所选记录，忽略当前页码和每页数量 |
 
 模板、导出接口通过 `Success(data={"filename": "...xlsx", "content": "Base64..."})` 返回文件，前端 `ExcelTransfer` 组件配合 `downloadExcel` 下载，沿用统一请求、鉴权和 Token 刷新流程。导入成功返回 `Success(data={"importedCount": N})`，页面刷新第一页。
+
+导出请求沿用搜索字段，额外支持 `ids?: SqidId[]`：省略或传 `null` 导出全部匹配记录；传数组时仅导出所选 ID 与当前筛选、`data_policy`、`excel_scope_filter` 的交集。空数组、非法 ID 或超过 10000 个 ID 均拒绝，不会回退为全量导出。所选记录仍按列表排序，重复 ID 不会重复导出，已删除或不可见记录不会出现在结果中。
+
+新生成页面的“导出 Excel”下拉菜单提供“导出筛选结果”和“导出所选（N 条）”，未勾选时禁用后者。已有页面可按下面接入，service 的导出参数类型扩展为 `SearchParams & { ids?: string[] }`；不传 `export-selected-api` 的旧页面保留原单按钮。选择范围沿用表格现有行为，不额外实现跨页全选。
+
+```vue
+<ExcelTransfer
+  :export-api="() => fetchExportCustomer(searchParams)"
+  :export-selected-api="ids => fetchExportCustomer({ ...searchParams, ids })"
+  :selected-ids="checkedRowKeys"
+  :import-api="fetchImportCustomer"
+  :template-api="fetchCustomerImportTemplate"
+/>
+```
 
 - 仅支持 `.xlsx`，上传最大 5MB，解压后最大 50MB，每次选择一个工作表、表头后最多 10000 行、最多 200 列；导出最多 10000 条，超限时必须缩小筛选范围，不会静默截断。
 - 模板与导出表头优先使用 `ExcelColumn.title`，其次使用 Schema `Field(title=...)`，最后回退字段名；现有英文表头仍可导入。

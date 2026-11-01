@@ -5,9 +5,10 @@ from typing import Any
 
 from fastapi import APIRouter, Form, Request, UploadFile
 from fastapi.routing import APIRoute
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError, create_model
 from starlette.concurrency import run_in_threadpool
 from tortoise.exceptions import IntegrityError
+from tortoise.expressions import Q
 from tortoise.transactions import in_transaction
 
 from app.core.base_schema import CommonIds, Success, SuccessExtra
@@ -16,7 +17,7 @@ from app.core.crud import CRUDBase, get_db_conn
 from app.core.excel import MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, ExcelImportOptions, ExcelImportResult, parse_excel, write_excel
 from app.core.exceptions import BizError
 from app.core.sqids import encode_id
-from app.core.types import SqidPath
+from app.core.types import SqidId, SqidPath
 
 
 @dataclass
@@ -252,7 +253,7 @@ class CRUDRouter:
             "import": "async def import_excel(file: UploadFile)",
             "import_template": "async def download_template()",
             "import_preview": "async def preview_import(file: UploadFile, options: str | None)",
-            "export": f"async def export_excel(obj_in: {self.list_schema.__name__}, request: Request)" if self.list_schema else "",
+            "export": f"async def export_excel(obj_in: {self.list_schema.__name__}Export, request: Request)" if self.list_schema else "",
         }
         spec["signature"] = signatures.get(name, "")
         return spec
@@ -503,11 +504,17 @@ class CRUDRouter:
             self._register_spec("import", f"/{self._resource}/import", {"POST"}, f"导入{self.summary_prefix}", import_excel)
         if "list" not in self.enable_routes or not self.list_schema:
             return
-        search_schema = self.list_schema
+        export_schema = create_model(
+            f"{self.list_schema.__name__}Export",
+            __base__=self.list_schema,
+            ids=(list[SqidId] | None, Field(default=None, min_length=1, max_length=MAX_ROWS, title="所选记录 ID")),
+        )
 
-        async def export_excel(obj_in: search_schema, request: Request) -> Success:  # type: ignore[valid-type]
+        async def export_excel(obj_in: export_schema, request: Request) -> Success:  # type: ignore[valid-type]
             search = self.search_fields
             q = controller.build_search(obj_in, **vars(search))
+            if obj_in.ids is not None:
+                q &= Q(id__in=obj_in.ids)
             if self.data_policy:
                 from app.core.policy import apply_data_policy
 

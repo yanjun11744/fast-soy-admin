@@ -20,6 +20,7 @@ from app.core.crud import CRUDBase
 from app.core.excel import ExcelColumn, ExcelConfig, ExcelImportOptions, parse_excel, read_excel, write_excel
 from app.core.exceptions import BizError, BizErrorHandle
 from app.core.router import CRUDRouter, SearchFieldConfig
+from app.core.sqids import encode_id
 from app.system.models.dictionary import Dictionary
 
 
@@ -170,12 +171,66 @@ def test_generator_includes_excel_and_scope_by_default():
     assert "<ExcelTransfer" in frontend
     assert "hasAuth('B_CRM_CUSTOMER_IMPORT')" in frontend
     assert "fetchExportCustomer(searchParams)" in frontend
+    assert ':selected-ids="checkedRowKeys"' in frontend
+    assert ':export-selected-api="ids => fetchExportCustomer({ ...searchParams, ids })"' in frontend
     service = gen_service_ts("crm", [model])
     assert "/import-template" in service and "/export" in service and "createExcelFormData" in service
     assert "multipart/form-data" in service
     assert "createExcelFormData(file, options)" in service
     assert "fetchPreviewImportCustomer" in service and "/import-preview" in service
+    assert "CustomerSearchParams & { ids?: string[] }" in service
     assert ':preview-api="fetchPreviewImportCustomer"' in frontend
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_selected_export_intersects_ids_search_and_permissions(app, monkeypatch):
+    async def scope(_request):
+        return Q(dict_type="selected-export")
+
+    async def policy(*args, **kwargs):
+        return Q(value__not="policy-hidden")
+
+    monkeypatch.setattr("app.core.policy.apply_data_policy", policy)
+    rows = [
+        await Dictionary.create(dict_type="selected-export", label="match", value="chosen"),
+        await Dictionary.create(dict_type="selected-export", label="match", value="unselected"),
+        await Dictionary.create(dict_type="selected-export", label="other", value="filtered"),
+        await Dictionary.create(dict_type="selected-export-other", label="match", value="hidden"),
+        await Dictionary.create(dict_type="selected-export", label="match", value="policy-hidden"),
+    ]
+    # Exercise both independent permission filters in the actual export endpoint.
+    crud = CRUDRouter(
+        prefix="/items", controller=CRUDBase(Dictionary), create_schema=DictionaryRow,
+        list_schema=DictionarySearch, excel=ExcelConfig(tuple(DictionaryRow.model_fields)),
+        search_fields=SearchFieldConfig(contains_fields=["label"]),
+        excel_scope_filter=scope, data_policy="test-policy",
+    )
+    api = FastAPI()
+    api.include_router(crud.router)
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=api), base_url="http://test") as client:
+            ids = [encode_id(row.id) for row in rows if row.value != "unselected"]
+            response = await client.post("/items/export", json={"ids": ids + ids[:1], "label": "match", "size": 1, "current": 2})
+            exported = read_excel(b64decode(response.json()["data"]["content"]), DictionaryRow, tuple(DictionaryRow.model_fields))
+            assert [row.value for row in exported] == ["chosen"]
+            empty = await client.post("/items/export", json={"ids": [encode_id(rows[3].id)]})
+            workbook = load_workbook(BytesIO(b64decode(empty.json()["data"]["content"])))
+            assert workbook.active.max_row == 1
+            workbook.close()
+    finally:
+        await Dictionary.filter(id__in=[row.id for row in rows]).delete()
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_selected_export_rejects_empty_invalid_and_excessive_ids(monkeypatch):
+    monkeypatch.setattr("app.core.router.MAX_ROWS", 2)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=excel_app()), base_url="http://test") as client:
+        for ids in ([], ["!invalid!"], [encode_id(i) for i in range(1, 4)]):
+            response = await client.post("/items/export", json={"ids": ids})
+            assert response.status_code == 422
+    schema = excel_app().openapi()
+    export_body = schema["paths"]["/items/export"]["post"]["requestBody"]["content"]["application/json"]["schema"]
+    assert "Export" in export_body["$ref"]
 
 
 def test_excel_is_opt_in_and_respects_route_and_field_boundaries():
