@@ -243,5 +243,34 @@ export const generatedRoutes: GeneratedRoute[] = [
       i18nKey: 'route.user-center',
       hideInMenu: true
     }
+  },
+  {
+    name: 'weighbridge-settlement',
+    path: '/weighbridge-settlement',
+    component: 'layout.base',
+    meta: {
+      title: 'weighbridge-settlement',
+      i18nKey: 'route.weighbridge-settlement'
+    },
+    children: [
+      {
+        name: 'weighbridge-settlement_settlement-rate',
+        path: '/weighbridge-settlement/settlement-rate',
+        component: 'view.weighbridge-settlement_settlement-rate',
+        meta: {
+          title: 'weighbridge-settlement_settlement-rate',
+          i18nKey: 'route.weighbridge-settlement_settlement-rate'
+        }
+      },
+      {
+        name: 'weighbridge-settlement_weighing-ticket',
+        path: '/weighbridge-settlement/weighing-ticket',
+        component: 'view.weighbridge-settlement_weighing-ticket',
+        meta: {
+          title: 'weighbridge-settlement_weighing-ticket',
+          i18nKey: 'route.weighbridge-settlement_weighing-ticket'
+        }
+      }
+    ]
   }
 ];

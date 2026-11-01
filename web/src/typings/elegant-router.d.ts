@@ -38,6 +38,9 @@ declare module "@elegant-router/types" {
     "order-management": "/order-management";
     "order-management_order": "/order-management/order";
     "user-center": "/user-center";
+    "weighbridge-settlement": "/weighbridge-settlement";
+    "weighbridge-settlement_settlement-rate": "/weighbridge-settlement/settlement-rate";
+    "weighbridge-settlement_weighing-ticket": "/weighbridge-settlement/weighing-ticket";
   };
 
   /**
@@ -77,6 +80,7 @@ declare module "@elegant-router/types" {
     | "manage"
     | "order-management"
     | "user-center"
+    | "weighbridge-settlement"
   >;
 
   /**
@@ -111,6 +115,8 @@ declare module "@elegant-router/types" {
     | "manage_user"
     | "order-management_order"
     | "user-center"
+    | "weighbridge-settlement_settlement-rate"
+    | "weighbridge-settlement_weighing-ticket"
   >;
 
   /**

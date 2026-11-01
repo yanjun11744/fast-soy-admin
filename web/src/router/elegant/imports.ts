@@ -33,4 +33,6 @@ export const views: Record<LastLevelRouteKey, RouteComponent | (() => Promise<Ro
   manage_user: () => import("@/views/manage/user/index.vue"),
   "order-management_order": () => import("@/views/order-management/order/index.vue"),
   "user-center": () => import("@/views/user-center/index.vue"),
+  "weighbridge-settlement_settlement-rate": () => import("@/views/weighbridge-settlement/settlement-rate/index.vue"),
+  "weighbridge-settlement_weighing-ticket": () => import("@/views/weighbridge-settlement/weighing-ticket/index.vue"),
 };

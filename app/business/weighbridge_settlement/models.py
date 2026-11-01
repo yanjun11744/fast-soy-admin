@@ -15,6 +15,7 @@ from tortoise import fields
 from tortoise.models import Model
 
 from app.utils import AuditMixin, BaseModel
+
 # ---- 在下方定义你的模型 ----
 #
 # class Example(BaseModel, AuditMixin):
@@ -37,6 +38,7 @@ from app.utils import AuditMixin, BaseModel
 #         table = "biz_weighbridge_settlement_example"
 #         table_description = "示例"
 
+
 class SettlementRate(BaseModel, AuditMixin):
     """工序招采价格"""
 
@@ -46,7 +48,7 @@ class SettlementRate(BaseModel, AuditMixin):
         max_length=100,
         unique=True,
         description="工序名称",
-    )   
+    )
 
     price = fields.DecimalField(
         max_digits=10,
@@ -65,9 +67,9 @@ class SettlementRate(BaseModel, AuditMixin):
 
 
 class WeighingTicket(BaseModel, AuditMixin):
-    """磅单信息"""  
+    """磅单信息"""
 
-    id = fields.IntField(primary_key=True)      
+    id = fields.IntField(primary_key=True)
 
     ticket_no = fields.CharField(
         max_length=100,
@@ -88,9 +90,7 @@ class WeighingTicket(BaseModel, AuditMixin):
 
     # 自定义工序价格关联
     rate_id: int
-    rate: fields.ForeignKeyRelation[
-        SettlementRate
-    ] = fields.ForeignKeyField(
+    rate: fields.ForeignKeyRelation[SettlementRate] = fields.ForeignKeyField(
         "app_system.SettlementRate",
         related_name="tickets",
         on_delete=fields.RESTRICT,
@@ -129,7 +129,6 @@ class WeighingTicket(BaseModel, AuditMixin):
         table_description = "磅单信息"
 
 
-
 class WeighingLine(BaseModel, AuditMixin):
     """磅单结算明细"""
 
@@ -137,9 +136,7 @@ class WeighingLine(BaseModel, AuditMixin):
 
     # 关联磅单
     ticket_id: int
-    ticket: fields.ForeignKeyRelation[
-        WeighingTicket
-    ] = fields.ForeignKeyField(
+    ticket: fields.ForeignKeyRelation[WeighingTicket] = fields.ForeignKeyField(
         "app_system.WeighingTicket",
         related_name="lines",
         on_delete=fields.CASCADE,
@@ -149,13 +146,11 @@ class WeighingLine(BaseModel, AuditMixin):
     # 关联订单资料
     order_id: int
 
-    order: fields.ForeignKeyRelation[Model] = (
-        fields.ForeignKeyField(
-            "app_system.Order",
-            related_name="weighing_lines",
-            on_delete=fields.RESTRICT,
-            description="关联订单",
-        )
+    order: fields.ForeignKeyRelation[Model] = fields.ForeignKeyField(
+        "app_system.Order",
+        related_name="weighing_lines",
+        on_delete=fields.RESTRICT,
+        description="关联订单",
     )
 
     position = fields.IntField(

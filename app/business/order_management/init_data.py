@@ -7,23 +7,33 @@ order_management 初始化数据 — 菜单、角色、种子数据。
 
 from app.system.services import apply_init_data
 
-INIT_DATA = {'menus': [{'menu_name': '订单管理',
-            'route_name': 'order-management',
-            'route_path': '/order-management',
-            'order': 8,
-            'icon': 'mdi:application-cog-outline',
-            'i18n_key': 'route.order-management',
-            'reconcile': {'menus': True, 'buttons': False},
-            'children': [{'menu_name': '订单资料',
-                          'route_name': 'order-management_order',
-                          'route_path': '/order-management/order',
-                          'component': 'view.order-management_order',
-                          'order': 1,
-                          'icon': 'mdi:table',
-                          'i18n_key': 'route.order-management_order'}]}],
- 'roles': [],
- 'users': [],
- 'dictionaries': []}
+INIT_DATA = {
+    "menus": [
+        {
+            "menu_name": "订单管理",
+            "route_name": "order-management",
+            "route_path": "/order-management",
+            "order": 8,
+            "icon": "mdi:application-cog-outline",
+            "i18n_key": "route.order-management",
+            "reconcile": {"menus": True, "buttons": False},
+            "children": [
+                {
+                    "menu_name": "订单资料",
+                    "route_name": "order-management_order",
+                    "route_path": "/order-management/order",
+                    "component": "view.order-management_order",
+                    "order": 1,
+                    "icon": "mdi:table",
+                    "i18n_key": "route.order-management_order",
+                }
+            ],
+        }
+    ],
+    "roles": [],
+    "users": [],
+    "dictionaries": [],
+}
 
 
 async def init() -> None:

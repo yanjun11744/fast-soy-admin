@@ -183,7 +183,10 @@ const routeMap: RouteMap = {
   "manage_user-detail": "/manage/user-detail/:id",
   "order-management": "/order-management",
   "order-management_order": "/order-management/order",
-  "user-center": "/user-center"
+  "user-center": "/user-center",
+  "weighbridge-settlement": "/weighbridge-settlement",
+  "weighbridge-settlement_settlement-rate": "/weighbridge-settlement/settlement-rate",
+  "weighbridge-settlement_weighing-ticket": "/weighbridge-settlement/weighing-ticket"
 };
 
 /**
