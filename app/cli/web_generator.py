@@ -889,7 +889,7 @@ function search() {{
   <NCard :bordered="false" size="small" class="card-wrapper">
     <NCollapse :default-expanded-names="['{entity_kebab}-search']">
       <NCollapseItem :title="$t('common.search')" name="{entity_kebab}-search">
-        <NForm :model="model" label-placement="left" :label-width="80">
+        <NForm :model="model" label-placement="left" :label-width="80" @submit.prevent="search">
           <NGrid responsive="screen" item-responsive>
 {chr(10).join(form_items)}
             <NFormItemGi span="24 s:12 m:6">
@@ -898,7 +898,7 @@ function search() {{
                   <template #icon><icon-ic-round-refresh class="text-icon" /></template>
                   {{{{ $t('common.reset') }}}}
                 </NButton>
-                <NButton type="primary" ghost @click="search">
+                <NButton type="primary" attr-type="submit" ghost>
                   <template #icon><icon-ic-round-search class="text-icon" /></template>
                   {{{{ $t('common.search') }}}}
                 </NButton>
