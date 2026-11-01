@@ -78,6 +78,8 @@ def collect_boundary_violations(*, include_core: bool = False) -> list[BoundaryV
     for path in APP_ROOT.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
+        if path.name.startswith("._"):
+            continue
         violations.extend(_violations_for_file(path, include_core=include_core))
     return violations
 
