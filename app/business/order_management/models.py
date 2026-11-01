@@ -65,7 +65,7 @@ class Order(BaseModel, AuditMixin):
     unit_weight = fields.DecimalField(
         max_digits=16,
         decimal_places=6,
-        description="机内单重/kg（净重）",
+        description="机内单重/kg",
     )
 
     unit = fields.CharField(
