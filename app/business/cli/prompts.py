@@ -147,7 +147,7 @@ def prompt_fields(
 
 def fuzzy_field_candidates(model: ModelInfo) -> list[FieldInfo]:
     """Text fuzzy matches and date ranges offered by default."""
-    return [field for field in model.schema_fields if field.field_type in {"CharField", "TextField"} | DATE_RANGE_FIELD_TYPES]
+    return [field for field in model.schema_fields if not field.image_kind and field.field_type in {"CharField", "TextField"} | DATE_RANGE_FIELD_TYPES]
 
 
 def exact_field_candidates(model: ModelInfo, contains_map: dict[str, list[str]] | None = None) -> list[PromptChoice]:
@@ -157,7 +157,7 @@ def exact_field_candidates(model: ModelInfo, contains_map: dict[str, list[str]] 
     skip_types = {"TextField", "JSONField"} | DATE_RANGE_FIELD_TYPES
 
     for field in model.schema_fields:
-        if field.name in contains or field.field_type in skip_types:
+        if field.image_kind or field.name in contains or field.field_type in skip_types:
             continue
         choices.append(PromptChoice(field.name, field.description or field.name))
 
@@ -231,7 +231,7 @@ def default_frontend_list_field_names(model: ModelInfo, candidates: list[PromptC
 def frontend_search_field_candidates(model: ModelInfo) -> list[ChoiceInput]:
     choices: list[ChoiceInput] = []
     for field in model.schema_fields:
-        if field.field_type != "JSONField":
+        if field.field_type != "JSONField" and not field.image_kind:
             choices.append(field)
     for relation in _fk_relation_candidates(model):
         choices.append(relation)

@@ -33,6 +33,7 @@ declare module "@elegant-router/types" {
     "manage_radar_queries": "/manage/radar/queries";
     "manage_radar_requests": "/manage/radar/requests";
     "manage_role": "/manage/role";
+    "manage_upload": "/manage/upload";
     "manage_user": "/manage/user";
     "manage_user-detail": "/manage/user-detail/:id";
     "order-management": "/order-management";
@@ -111,6 +112,7 @@ declare module "@elegant-router/types" {
     | "manage_radar_queries"
     | "manage_radar_requests"
     | "manage_role"
+    | "manage_upload"
     | "manage_user-detail"
     | "manage_user"
     | "order-management_order"

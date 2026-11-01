@@ -37,6 +37,8 @@ def _field_type_hint(f: FieldInfo) -> str:
     - CharEnumField / IntEnumField → 枚举类型名（由 parser 填入 python_type）
     - 其他字段沿用 python_type
     """
+    if f.image_kind and f.field_type == "JSONField":
+        return "list[str]"
     if f.enum_type:
         return f.enum_type
 
@@ -546,6 +548,8 @@ def _model_menu_children(
         }
         if model.name in button_auth_models:
             item["buttons"] = _model_button_defs(module_name, model)
+        if any(f.image_kind for f in model.schema_fields):
+            item.setdefault("buttons", []).append({"button_code": "B_SYSTEM_UPLOAD_CREATE", "button_desc": "上传图片"})
         children.append(item)
     return children
 

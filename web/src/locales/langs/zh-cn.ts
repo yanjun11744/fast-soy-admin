@@ -1,4 +1,26 @@
 const local: App.I18n.BaseSchema = {
+  imageTools: {
+    moveEarlier: '向前移动图片',
+    moveLater: '向后移动图片',
+    imageAlt: '图片 {index}',
+    add: '上传图片',
+    invalid: '请选择 JPG、PNG、GIF 或 WebP 图片，文件不能为空且不超过 {size} MB',
+    limit: '最多上传 {count} 张图片',
+    tip: '支持 JPG / PNG / GIF / WebP，单张最多 {size} MB，最多 {count} 张；点击缩略图预览，失败后可重试。',
+    settings: '本地上传配置',
+    directory: '服务器存储目录',
+    directoryHint:
+      '目录位于后端服务器，相对路径以项目根目录为起点。保存时检查写入权限；修改后仅影响新上传，旧图片继续从原目录读取，请保留旧目录。此处图片通过随机链接公开访问，请勿上传私密文件。',
+    maxSize: '单张大小限制（MB）',
+    library: '图片浏览',
+    search: '按文件名搜索',
+    empty: '暂无上传图片',
+    copy: '复制图片链接',
+    copied: '图片链接已复制',
+    copyFailed: '复制失败，请检查浏览器剪贴板权限',
+    sourceHint:
+      '图片字段会生成上传表单和可预览的缩略图列。模型使用 avatar、cover、image、images 等字段名即可自动识别；其他字段在 description 中加 [image] 或 [images]。多图可用 TextField（逗号分隔）或 JSONField（字符串数组）。请先在 models.py 声明后重新解析；为业务角色分配“上传图片”按钮权限。'
+  },
   system: {
     title: 'Soybean 管理系统',
     updateTitle: '系统版本更新通知',
@@ -262,6 +284,7 @@ const local: App.I18n.BaseSchema = {
     manage_role: '角色管理',
     manage_menu: '菜单管理',
     manage_codegen: '代码生成',
+    manage_upload: '上传管理',
     manage_radar: '性能监控',
     manage_radar_overview: '仪表盘',
     manage_radar_requests: '请求列表',

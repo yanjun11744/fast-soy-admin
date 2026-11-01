@@ -188,6 +188,15 @@ export const generatedRoutes: GeneratedRoute[] = [
         }
       },
       {
+        name: 'manage_upload',
+        path: '/manage/upload',
+        component: 'view.manage_upload',
+        meta: {
+          title: 'manage_upload',
+          i18nKey: 'route.manage_upload'
+        }
+      },
+      {
         name: 'manage_user',
         path: '/manage/user',
         component: 'view.manage_user',

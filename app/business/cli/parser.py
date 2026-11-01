@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -45,6 +46,21 @@ class FieldInfo:
     primary_key: bool = False
     # CharEnumField 专用
     enum_type: str | None = None
+
+    @property
+    def image_kind(self) -> str | None:
+        """显式 description 标记优先；只对确定的图片字段名启用。"""
+        if self.field_type not in {"CharField", "TextField", "JSONField"}:
+            return None
+        if "[images]" in self.description.lower():
+            return "multiple"
+        if "[image]" in self.description.lower():
+            return "single"
+        if re.fullmatch(r"(?:.*_)?(?:images|photos|pictures)(?:_urls)?", self.name):
+            return "multiple"
+        if re.fullmatch(r"(?:.*_)?(?:image|photo|picture|avatar|cover|logo)(?:_url)?", self.name):
+            return "single"
+        return None
 
 
 @dataclass
