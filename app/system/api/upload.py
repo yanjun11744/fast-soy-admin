@@ -7,8 +7,9 @@ from app.core.base_schema import Success, SuccessExtra
 from app.core.code import Code
 from app.core.dependency import DependAuth, DependPermission, require_buttons
 from app.core.exceptions import BizError
-from app.system.schemas.upload import ImageSearch, UploadSettingUpdate
-from app.system.services.upload import get_image_path, get_upload_setting, save_image, search_images, update_upload_setting
+from app.core.types import SqidPath
+from app.system.schemas.upload import ImageDelete, ImageSearch, ImageUpdate, UploadSettingUpdate
+from app.system.services.upload import delete_images, get_image, get_image_path, get_upload_setting, save_image, search_images, update_image, update_upload_setting
 
 router = APIRouter()
 
@@ -48,6 +49,26 @@ async def upload_image(file: Annotated[UploadFile, File()]) -> Success:
 async def list_images(obj: ImageSearch) -> SuccessExtra:
     total, records = await search_images(obj)
     return SuccessExtra(data={"records": records}, total=total, current=obj.current, size=obj.size)
+
+
+@router.get("/uploads/images/{item_id}", dependencies=[DependPermission], summary="上传图片详情")
+async def image_detail(item_id: SqidPath) -> Success:
+    return Success(data=await get_image(item_id))
+
+
+@router.patch("/uploads/images/{item_id}", dependencies=[DependPermission, require_buttons("B_SYSTEM_UPLOAD_EDIT")], summary="重命名上传图片")
+async def rename_image(item_id: SqidPath, obj: ImageUpdate) -> Success:
+    return Success(data=await update_image(item_id, obj))
+
+
+@router.delete("/uploads/images/{item_id}", dependencies=[DependPermission, require_buttons("B_SYSTEM_UPLOAD_DELETE")], summary="删除上传图片")
+async def delete_image(item_id: SqidPath) -> Success:
+    return Success(data={"deletedCount": await delete_images([item_id])})
+
+
+@router.delete("/uploads/images", dependencies=[DependPermission, require_buttons("B_SYSTEM_UPLOAD_DELETE")], summary="批量删除上传图片")
+async def batch_delete_images(obj: ImageDelete) -> Success:
+    return Success(data={"deletedCount": await delete_images(obj.ids)})
 
 
 @router.get("/uploads/content/{key}", summary="显示公开图片", include_in_schema=False)
