@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from app.cli.parser import FieldInfo, ModelInfo, RelationInfo
+from app.cli.parser import DATE_RANGE_FIELD_TYPES, FieldInfo, ModelInfo, RelationInfo
 
 # ─── 命名转换 ───
 
@@ -295,7 +295,10 @@ def gen_typings_dts(module: str, models: list[ModelInfo], search_fields_map: dic
             f = next((x for x in fields if x.name == name), None)
             if f:
                 camel = snake_to_camel(name)
-                lines.append(f"        {camel}?: {field_ts_type(f)};")
+                if f.field_type in DATE_RANGE_FIELD_TYPES:
+                    lines.extend([f"        {camel}Start?: string;", f"        {camel}End?: string;"])
+                else:
+                    lines.append(f"        {camel}?: {field_ts_type(f)};")
                 continue
             r = find_fk_relation(model, name)
             if r:
@@ -503,7 +506,11 @@ def gen_view_index(
     for name in search_field_names:
         f = next((x for x in fields if x.name == name), None)
         if f:
-            search_param_lines.append(f"  {snake_to_camel(name)}: null,")
+            camel = snake_to_camel(name)
+            if f.field_type in DATE_RANGE_FIELD_TYPES:
+                search_param_lines.extend([f"  {camel}Start: null,", f"  {camel}End: null,"])
+            else:
+                search_param_lines.append(f"  {camel}: null,")
             continue
         r = find_fk_relation(model, name)
         if r:
@@ -726,6 +733,7 @@ def gen_view_search(module: str, model: ModelInfo, search_field_names: list[str]
 
     fields = model.schema_fields
     option_props: list[str] = []
+    range_bindings: list[str] = []
 
     # 生成 form items
     form_items: list[str] = []
@@ -792,10 +800,18 @@ def gen_view_search(module: str, model: ModelInfo, search_field_names: list[str]
                 f'                @update:value="value => (model.{camel} = value as boolean | null)"\n'
                 "              />"
             )
-        elif component == "date":
-            body = f'              <NDatePicker v-model:formatted-value="model.{camel}" type="date" value-format="yyyy-MM-dd" clearable class="w-full" />'
-        elif component == "datetime":
-            body = f'              <NDatePicker v-model:formatted-value="model.{camel}" type="datetime" value-format="yyyy-MM-dd HH:mm:ss" clearable class="w-full" />'
+        elif component in ("date", "datetime"):
+            value_format = "yyyy-MM-dd" if component == "date" else "yyyy-MM-dd HH:mm:ss"
+            range_bindings.append(f"""const {camel}Range = computed<[string, string] | null>({{
+  get: (): [string, string] | null => model.value.{camel}Start && model.value.{camel}End
+    ? [model.value.{camel}Start, model.value.{camel}End]
+    : null,
+  set: (value: [string, string] | null) => {{
+    model.value.{camel}Start = value?.[0] ?? null;
+    model.value.{camel}End = value?.[1] ?? null;
+  }}
+}});""")
+            body = f'              <NDatePicker v-model:formatted-value="{camel}Range" type="{component}range" value-format="{value_format}" clearable class="w-full" />'
         elif component == "time":
             body = f'              <NTimePicker v-model:formatted-value="model.{camel}" value-format="HH:mm:ss" clearable class="w-full" />'
         else:
@@ -810,6 +826,8 @@ def gen_view_search(module: str, model: ModelInfo, search_field_names: list[str]
     imports = [
         "import { $t } from '@/locales';",
     ]
+    if range_bindings:
+        imports.insert(0, "import { computed } from 'vue';")
     if needs_status_import:
         imports.append("import { statusTypeOptions } from '@/constants/business';")
 
@@ -856,6 +874,7 @@ interface Emits {{
 
 const emit = defineEmits<Emits>();
 const model = defineModel<Api.{ns}.{entity}SearchParams>('model', {{ required: true }});
+{chr(10).join(range_bindings)}
 
 function reset() {{
   emit('reset');

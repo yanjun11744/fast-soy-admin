@@ -26,6 +26,7 @@ FIELD_TYPE_MAP: dict[str, str] = {
 }
 
 RELATION_FIELDS = {"ForeignKeyField", "ManyToManyField", "OneToOneField"}
+DATE_RANGE_FIELD_TYPES = {"DateField", "DatetimeField"}
 
 # 自动跳过的字段（由 BaseModel / AuditMixin 提供）
 SKIP_FIELDS = {"id", "created_by", "created_at", "updated_by", "updated_at"}
