@@ -24,6 +24,13 @@ const failed = ref(false);
 const saving = ref(false);
 const rates = ref<Api.WeighbridgeSettlementManage.RateOption[]>([]);
 const model = ref(defaultModel());
+// NDatePicker requires null for an empty date; an empty string parses to NaN.
+const weighingDate = computed({
+  get: () => model.value.weighingDate || null,
+  set: (value: string | null) => {
+    model.value.weighingDate = value ?? '';
+  }
+});
 const process = ref('');
 const price = ref('');
 const revision = ref(1);
@@ -232,7 +239,7 @@ const totalTheoretical = computed(() => {
             </NFormItem>
             <NFormItem :label="$t('page.weighbridge_settlement.weighing_ticket.weighingDate')" required>
               <NDatePicker
-                v-model:formatted-value="model.weighingDate"
+                v-model:formatted-value="weighingDate"
                 type="date"
                 value-format="yyyy-MM-dd"
                 class="w-full"
