@@ -178,14 +178,14 @@ class WeighingLine(BaseModel, AuditMixin):
     net_weight = fields.DecimalField(
         max_digits=16,
         decimal_places=6,
-        description="净重快照/kg",
+        description="净重快照",
     )
 
     gross_weight = fields.DecimalField(
         max_digits=16,
         decimal_places=6,
         null=True,
-        description="毛重快照/kg",
+        description="毛重快照",
     )
 
     # 本次实际过磅数量
