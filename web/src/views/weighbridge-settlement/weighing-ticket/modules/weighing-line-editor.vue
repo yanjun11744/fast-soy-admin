@@ -6,18 +6,19 @@ import { $t } from '@/locales';
 const line = defineModel<Api.WeighbridgeSettlementManage.LineInput>({ required: true });
 defineProps<{ readonly?: boolean }>();
 const manual = ref(!line.value.orderId && Boolean(line.value.partNo));
+const missingGrossWeight = ref(!(Number(line.value.grossWeight) > 0));
 const query = ref('');
 const options = ref<Api.WeighbridgeSettlementManage.OrderOption[]>([]);
 const searching = ref(false);
 const selectOptions = computed(() => {
   const result = options.value.map(order => ({
     value: order.id,
-    label: `${order.partNo} | ${order.orderNo} | ${order.name} | ${order.unitWeight} kg`
+    label: `${order.partNo} | ${order.orderNo} | ${order.name} | ${order.netWeight} kg`
   }));
   if (line.value.orderId && !result.some(option => option.value === line.value.orderId)) {
     result.push({
       value: line.value.orderId,
-      label: `${line.value.partNo} | ${line.value.orderNo ?? ''} | ${line.value.name} | ${line.value.unitWeight} kg`
+      label: `${line.value.partNo} | ${line.value.orderNo ?? ''} | ${line.value.name} | ${line.value.netWeight} kg`
     });
   }
   return result;
@@ -43,14 +44,17 @@ function search(value: string) {
 }
 function choose(id: string) {
   const order = options.value.find(item => item.id === id);
-  if (order)
+  if (order) {
+    missingGrossWeight.value = !(Number(order.grossWeight) > 0);
     Object.assign(line.value, {
       orderId: order.id,
       partNo: order.partNo,
       orderNo: order.orderNo,
       name: order.name,
-      unitWeight: order.unitWeight
+      netWeight: order.netWeight,
+      grossWeight: order.grossWeight ?? null
     });
+  }
 }
 function setManual(value: boolean) {
   manual.value = value;
@@ -111,10 +115,16 @@ onBeforeUnmount(() => {
         :aria-label="$t('page.weighbridge_settlement.settlement.name')"
       />
       <NInput
-        v-model:value="line.unitWeight"
+        v-model:value="line.netWeight"
         :disabled="readonly || !manual"
-        :placeholder="$t('page.weighbridge_settlement.settlement.unitWeight')"
-        :aria-label="$t('page.weighbridge_settlement.settlement.unitWeight')"
+        :placeholder="$t('page.weighbridge_settlement.settlement.netWeight')"
+        :aria-label="$t('page.weighbridge_settlement.settlement.netWeight')"
+      />
+      <NInput
+        v-model:value="line.grossWeight"
+        :disabled="readonly || (!manual && !missingGrossWeight)"
+        :placeholder="$t('page.weighbridge_settlement.settlement.grossWeight')"
+        :aria-label="$t('page.weighbridge_settlement.settlement.grossWeight')"
       />
     </div>
     <NFormItem :label="$t('page.weighbridge_settlement.settlement.quantity')" :show-feedback="false">

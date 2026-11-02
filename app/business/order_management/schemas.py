@@ -20,7 +20,8 @@ class OrderBase(SchemaBase):
     order_no: Annotated[str, Field(max_length=100)] | None = Field(None, title="订单号")
     part_no: Annotated[str, Field(max_length=200)] | None = Field(None, title="项目号")
     name: Annotated[str, Field(max_length=200)] | None = Field(None, title="名称")
-    unit_weight: Decimal | None = Field(None, title="机内单重/kg（净重）")
+    net_weight: Decimal | None = Field(None, title="净重/kg")
+    gross_weight: Decimal | None = Field(None, ge=0, max_digits=16, decimal_places=6, title="毛重/kg")
     unit: Annotated[str, Field(max_length=50)] | None = Field(None, title="单位")
     quantity: Int32 | None = Field(None, title="数量")
     received_quantity: Int32 | None = Field(None, title="入库数量")
@@ -35,7 +36,7 @@ class OrderCreate(OrderBase):
     order_no: Annotated[str, Field(max_length=100)] = Field(title="订单号")
     part_no: Annotated[str, Field(max_length=200)] = Field(title="项目号")
     name: Annotated[str, Field(max_length=200)] = Field(title="名称")
-    unit_weight: Decimal = Field(title="机内单重/kg（净重）")
+    net_weight: Decimal = Field(title="净重/kg")
 
 
 class OrderUpdate(OrderBase): ...

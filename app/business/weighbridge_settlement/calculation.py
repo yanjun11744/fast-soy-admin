@@ -19,11 +19,13 @@ def calculate(weight: Decimal, price: Decimal, lines: list[dict[str, Any]]) -> t
         result = []
         for position, line in enumerate(lines, 1):
             row = dict(line)
-            unit = Decimal(str(row["unit_weight"])).quantize(Decimal(".000001"), rounding=ROUND_HALF_UP)
+            if row.get("gross_weight") is None:
+                raise BizError(code="4601", msg="请补填明细毛重后重新保存磅单")
+            unit = Decimal(str(row["gross_weight"])).quantize(Decimal(".000001"), rounding=ROUND_HALF_UP)
             quantity = row["quantity"]
-            if unit <= 0 or not isinstance(quantity, int) or isinstance(quantity, bool) or quantity <= 0:
-                raise BizError(code="4601", msg="明细单重及实际数量必须大于零")
-            row.update(position=position, unit_weight=unit, theoretical_weight=unit * quantity)
+            if not unit.is_finite() or unit <= 0 or not isinstance(quantity, int) or isinstance(quantity, bool) or quantity <= 0:
+                raise BizError(code="4601", msg="明细毛重及实际数量必须大于零")
+            row.update(position=position, gross_weight=unit, theoretical_weight=unit * quantity)
             if row["theoretical_weight"] >= Decimal("1e18"):
                 raise BizError(code="4601", msg="理论重量超出存储范围")
             result.append(row)

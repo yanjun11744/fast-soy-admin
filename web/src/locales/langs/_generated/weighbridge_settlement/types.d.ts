@@ -11,7 +11,8 @@ declare global {
           partNo: string;
           orderNo: string;
           name: string;
-          unitWeight: string;
+          netWeight: string;
+          grossWeight: string;
           quantity: string;
           theoreticalWeight: string;
           allocatedWeight: string;

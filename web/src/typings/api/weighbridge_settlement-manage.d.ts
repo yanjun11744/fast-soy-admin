@@ -47,7 +47,8 @@ declare namespace Api {
       orderNo: string | null;
       partNo: string;
       name: string;
-      unitWeight: string;
+      netWeight: string;
+      grossWeight?: string | null;
       quantity: number;
     };
     type WeighingLine = LineInput & {
@@ -65,7 +66,14 @@ declare namespace Api {
       lines: WeighingLine[];
     };
     type RateOption = { id: string; processName: string; price: string };
-    type OrderOption = { id: string; partNo: string; orderNo: string; name: string; unitWeight: string };
+    type OrderOption = {
+      id: string;
+      partNo: string;
+      orderNo: string;
+      name: string;
+      netWeight: string;
+      grossWeight?: string | null;
+    };
     type Preview = { totalAmount: string; lines: WeighingLine[] };
     type WeighingTicketAddParams = {
       ticketNo: string;

@@ -82,14 +82,17 @@ async def save_ticket(payload: WeighingTicketCreate | WeighingTicketUpdate, tick
                     raise BizError(code="4606", msg="同一磅单不能重复选择相同订单")
                 orders.add(item.order_id)
                 if old and old.order_id == item.order_id:
-                    row.update({key: getattr(old, key) for key in ("order_no", "part_no", "name", "unit_weight")})
+                    row.update({key: getattr(old, key) for key in ("order_no", "part_no", "name", "net_weight", "gross_weight")})
+                    # Historical snapshots may have no usable gross weight; allow filling it once.
+                    if old.gross_weight is None or old.gross_weight <= 0:
+                        row["gross_weight"] = item.gross_weight
                 else:
                     order = await order_model().filter(id=item.order_id).using_db(db).first()
                     if order is None:
                         raise BizError(code="4607", msg="所选订单不存在")
-                    row.update({key: getattr(order, key) for key in ("order_no", "part_no", "name", "unit_weight")})
-            elif not item.part_no or not item.name or item.unit_weight is None:
-                raise BizError(code="4601", msg="手动录入需要项目号、名称及单重")
+                    row.update({key: getattr(order, key) for key in ("order_no", "part_no", "name", "net_weight", "gross_weight")})
+            elif not item.part_no or not item.name or item.net_weight is None:
+                raise BizError(code="4601", msg="手动录入需要项目号、名称及净重")
             row["id"] = item.id
             rows.append(row)
         amount, rows = calculate(payload.weight, price, rows)
@@ -128,7 +131,7 @@ async def settle_ticket(ticket_id: int, revision: int) -> dict[str, Any]:
         if not await SettlementRate.filter(id=ticket.rate_id).using_db(db).exists():
             raise BizError(code="4605", msg="磅单工序不存在")
         lines = await WeighingLine.filter(ticket_id=ticket.id).using_db(db).order_by("position")
-        amount, computed = calculate(ticket.weight, ticket.price, [{key: getattr(line, key) for key in ("unit_weight", "quantity")} for line in lines])
+        amount, computed = calculate(ticket.weight, ticket.price, [{key: getattr(line, key) for key in ("gross_weight", "quantity")} for line in lines])
         fields = ("theoretical_weight", "allocated_weight", "amount", "tax_unit_price")
         if amount != ticket.total_amount or any(getattr(line, key) != row[key] for line, row in zip(lines, computed, strict=True) for key in fields):
             raise BizError(code="4608", msg="明细分摊不一致，请先编辑并保存磅单")
@@ -156,7 +159,7 @@ async def rate_options() -> list[dict[str, Any]]:
 
 async def order_options(query: OrderLookup) -> list[dict[str, Any]]:
     model = order_model()
-    fields = ("id", "part_no", "order_no", "name", "unit_weight")
+    fields = ("id", "part_no", "order_no", "name", "net_weight", "gross_weight")
     exact = await model.filter(part_no=query.part_no).order_by("id").limit(query.limit).only(*fields)
     remaining = query.limit - len(exact)
     partial = await model.filter(part_no__icontains=query.part_no).exclude(part_no=query.part_no).order_by("part_no", "id").limit(remaining).only(*fields) if remaining else []

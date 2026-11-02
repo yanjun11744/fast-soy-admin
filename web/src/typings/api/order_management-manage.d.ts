@@ -9,7 +9,8 @@ declare namespace Api {
       orderNo: string;
       partNo: string;
       name: string;
-      unitWeight: number;
+      netWeight: number;
+      grossWeight?: number | null;
       unit: string | null;
       quantity: number | null;
       receivedQuantity: number | null;
@@ -24,7 +25,8 @@ declare namespace Api {
       orderNo: string;
       partNo: string;
       name: string;
-      unitWeight: number;
+      netWeight: number;
+      grossWeight?: number | null;
       unit?: string | null;
       quantity?: number | null;
       receivedQuantity?: number | null;
@@ -51,6 +53,5 @@ declare namespace Api {
     >;
 
     type OrderList = Common.PaginatingQueryRecord<Order>;
-
   }
 }

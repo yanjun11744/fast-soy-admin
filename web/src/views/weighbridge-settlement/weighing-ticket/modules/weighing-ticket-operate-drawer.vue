@@ -64,7 +64,8 @@ function toInput(line: Api.WeighbridgeSettlementManage.LineInput): Api.Weighbrid
     orderNo: line.orderNo,
     partNo: line.partNo,
     name: line.name,
-    unitWeight: String(line.unitWeight),
+    netWeight: String(line.netWeight),
+    grossWeight: line.grossWeight?.trim() || null,
     quantity: line.quantity
   };
 }
@@ -86,7 +87,7 @@ function selectRate(id: string) {
   rateChanged.value = true;
 }
 function addLine() {
-  model.value.lines.push({ orderId: null, orderNo: '', partNo: '', name: '', unitWeight: '', quantity: 0 });
+  model.value.lines.push({ orderId: null, orderNo: '', partNo: '', name: '', netWeight: '', quantity: 0 });
   rowKeys.value.push(++nextKey);
 }
 function removeLine(index: number) {
@@ -103,8 +104,9 @@ function valid() {
       line =>
         line.partNo.trim() &&
         line.name.trim() &&
-        /^\d+(\.\d{1,6})?$/.test(String(line.unitWeight)) &&
-        Number(line.unitWeight) > 0 &&
+        /^\d+(\.\d{1,6})?$/.test(String(line.netWeight)) &&
+        Number(line.netWeight) > 0 &&
+        (/^\d+(\.\d{1,6})?$/.test(line.grossWeight ?? '') && Number(line.grossWeight) > 0) &&
         Number.isInteger(line.quantity) &&
         line.quantity > 0
     )

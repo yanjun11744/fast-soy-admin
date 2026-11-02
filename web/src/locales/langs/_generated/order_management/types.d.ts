@@ -14,7 +14,8 @@ declare global {
           orderNo: string;
           partNo: string;
           name: string;
-          unitWeight: string;
+          netWeight: string;
+          grossWeight: string;
           unit: string;
           quantity: string;
           receivedQuantity: string;
@@ -27,7 +28,8 @@ declare global {
             orderNo: string;
             partNo: string;
             name: string;
-            unitWeight: string;
+            netWeight: string;
+            grossWeight: string;
             unit: string;
             quantity: string;
             receivedQuantity: string;

@@ -5,7 +5,6 @@ import { fetchAddOrder, fetchUpdateOrder } from '@/service/api';
 import { useFormRules, useNaiveForm } from '@/hooks/common/form';
 import { $t } from '@/locales';
 
-
 defineOptions({ name: 'OrderOperateDrawer' });
 
 interface Props {
@@ -39,7 +38,8 @@ function createDefaultModel(): Api.OrderManagementManage.OrderAddParams {
     orderNo: '',
     partNo: '',
     name: '',
-    unitWeight: null,
+    netWeight: null,
+    grossWeight: null,
     unit: '',
     quantity: null,
     receivedQuantity: null,
@@ -55,9 +55,8 @@ const rules: Record<string, App.Global.FormRule> = {
   orderNo: defaultRequiredRule,
   partNo: defaultRequiredRule,
   name: defaultRequiredRule,
-  unitWeight: defaultRequiredRule
+  netWeight: defaultRequiredRule
 };
-
 
 function handleInitModel() {
   model.value = createDefaultModel();
@@ -106,20 +105,46 @@ watch(visible, () => {
         <NFormItem :label="$t('page.order_management.order.name')" path="name">
           <NInput v-model:value="model.name" :placeholder="$t('page.order_management.order.form.name')" />
         </NFormItem>
-        <NFormItem :label="$t('page.order_management.order.unitWeight')" path="unitWeight">
-          <NInputNumber v-model:value="model.unitWeight" :precision="2" :placeholder="$t('page.order_management.order.form.unitWeight')" class="w-full" />
+        <NFormItem :label="$t('page.order_management.order.netWeight')" path="netWeight">
+          <NInputNumber
+            v-model:value="model.netWeight"
+            :precision="6"
+            :placeholder="$t('page.order_management.order.form.netWeight')"
+            class="w-full"
+          />
+        </NFormItem>
+        <NFormItem :label="$t('page.order_management.order.grossWeight')" path="grossWeight">
+          <NInputNumber
+            v-model:value="model.grossWeight"
+            :precision="6"
+            :placeholder="$t('page.order_management.order.form.grossWeight')"
+            class="w-full"
+          />
         </NFormItem>
         <NFormItem :label="$t('page.order_management.order.unit')" path="unit">
           <NInput v-model:value="model.unit" :placeholder="$t('page.order_management.order.form.unit')" />
         </NFormItem>
         <NFormItem :label="$t('page.order_management.order.quantity')" path="quantity">
-          <NInputNumber v-model:value="model.quantity" :placeholder="$t('page.order_management.order.form.quantity')" class="w-full" />
+          <NInputNumber
+            v-model:value="model.quantity"
+            :placeholder="$t('page.order_management.order.form.quantity')"
+            class="w-full"
+          />
         </NFormItem>
         <NFormItem :label="$t('page.order_management.order.receivedQuantity')" path="receivedQuantity">
-          <NInputNumber v-model:value="model.receivedQuantity" :placeholder="$t('page.order_management.order.form.receivedQuantity')" class="w-full" />
+          <NInputNumber
+            v-model:value="model.receivedQuantity"
+            :placeholder="$t('page.order_management.order.form.receivedQuantity')"
+            class="w-full"
+          />
         </NFormItem>
         <NFormItem :label="$t('page.order_management.order.totalWeight')" path="totalWeight">
-          <NInputNumber v-model:value="model.totalWeight" :precision="2" :placeholder="$t('page.order_management.order.form.totalWeight')" class="w-full" />
+          <NInputNumber
+            v-model:value="model.totalWeight"
+            :precision="2"
+            :placeholder="$t('page.order_management.order.form.totalWeight')"
+            class="w-full"
+          />
         </NFormItem>
         <NFormItem :label="$t('page.order_management.order.orderDueDate')" path="orderDueDate">
           <NDatePicker
@@ -140,7 +165,10 @@ watch(visible, () => {
           />
         </NFormItem>
         <NFormItem :label="$t('page.order_management.order.processRoute')" path="processRoute">
-          <NInput v-model:value="model.processRoute" :placeholder="$t('page.order_management.order.form.processRoute')" />
+          <NInput
+            v-model:value="model.processRoute"
+            :placeholder="$t('page.order_management.order.form.processRoute')"
+          />
         </NFormItem>
         <NFormItem :label="$t('page.order_management.order.customer')" path="customer">
           <NInput v-model:value="model.customer" :placeholder="$t('page.order_management.order.form.customer')" />

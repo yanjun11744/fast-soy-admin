@@ -40,21 +40,21 @@ def payload(rate, **overrides):
         weight="100.001",
         rateId=encode_id(rate.id),
         lines=[
-            dict(orderId=None, partNo="manual-1", name="手动一", unitWeight="1.000001", quantity=3),
-            dict(orderId=None, partNo="manual-2", name="手动二", unitWeight="2.000000", quantity=2),
+            dict(orderId=None, partNo="manual-1", name="手动一", netWeight="1.000001", grossWeight="1.500001", quantity=3),
+            dict(orderId=None, partNo="manual-2", name="手动二", netWeight="2.000000", grossWeight="2.500000", quantity=2),
         ],
     )
     return {**data, **overrides}
 
 
 def edit_payload(detail, **overrides):
-    keys = ["id", "orderId", "orderNo", "partNo", "name", "unitWeight", "quantity"]
+    keys = ["id", "orderId", "orderNo", "partNo", "name", "netWeight", "grossWeight", "quantity"]
     return {**{key: detail[key] for key in ["ticketNo", "weighingDate", "weight", "revision"]}, "lines": [{key: line[key] for key in keys} for line in detail["lines"]], **overrides}
 
 
 @pytest.mark.parametrize("weight,price,count", [("100.001", "2.5000", 3), ("0.002", "99.9999", 30), ("999999.999", "0.0001", 7)])
 def test_decimal_residuals(weight, price, count):
-    amount, lines = calculate(Decimal(weight), Decimal(price), [dict(unit_weight=Decimal("1.000001"), quantity=3) for _ in range(count)])
+    amount, lines = calculate(Decimal(weight), Decimal(price), [dict(gross_weight=Decimal("1.000001"), quantity=3) for _ in range(count)])
     assert sum(row["allocated_weight"] for row in lines) == Decimal(weight)
     assert sum(row["amount"] for row in lines) == amount
     assert all(row["allocated_weight"] >= 0 and row["amount"] >= 0 for row in lines)
@@ -65,25 +65,31 @@ def test_decimal_residuals(weight, price, count):
 @pytest.mark.asyncio(loop_scope="session")
 async def test_manual_and_matched_persistence_snapshot_revision_and_lock(settlement_db):
     rate = settlement_db
-    order = await Order.create(order_no="O-1", part_no="P-1", name="原名称", unit_weight="3.123456", quantity=999)
+    order = await Order.create(order_no="O-1", part_no="P-1", name="原名称", net_weight="3.123456", gross_weight="4.654321", quantity=999)
     data = payload(rate)
     data["lines"].insert(0, dict(orderId=encode_id(order.id), quantity=2))
     saved = await services.save_ticket(WeighingTicketCreate.model_validate(data))
     ticket_id = decode_id(saved["id"])
     assert len(saved["lines"]) == 3
     assert saved["lines"][0]["quantity"] == 2
-    assert saved["lines"][0]["unitWeight"] == "3.123456"
+    assert saved["lines"][0]["netWeight"] == "3.123456"
+    assert saved["lines"][0]["grossWeight"] == "4.654321"
+    assert saved["lines"][1]["grossWeight"] == "1.500001"
+    assert saved["lines"][2]["grossWeight"] == "2.500000"
+    assert saved["lines"][1]["theoreticalWeight"] == "4.500003"
     assert all(row["orderId"] is None for row in saved["lines"][1:])
     assert await Order.all().count() == 1
     assert await services.detail(ticket_id) == saved
     await SettlementRate.filter(id=rate.id).update(price=Decimal("9.9999"), enabled=False)
-    await Order.filter(id=order.id).update(name="新名称", unit_weight="9.000000")
+    await Order.filter(id=order.id).update(name="新名称", net_weight="9.000000", gross_weight="10.000000")
     original_ids = [line["id"] for line in saved["lines"]]
     changed = edit_payload(saved, weight="120.001")
     changed["lines"] = list(reversed(changed["lines"]))
     updated = await services.save_ticket(WeighingTicketUpdate.model_validate(changed), ticket_id)
     assert updated["price"] == "2.5" or Decimal(updated["price"]) == Decimal("2.5000")
     assert updated["lines"][-1]["name"] == "原名称"
+    assert updated["lines"][-1]["grossWeight"] == "4.654321"
+    assert updated["lines"][1]["grossWeight"] == "1.500001"
     assert [line["id"] for line in updated["lines"]] == list(reversed(original_ids))
     with pytest.raises(BizError, match="其他用户"):
         await services.save_ticket(WeighingTicketUpdate.model_validate(changed), ticket_id)
@@ -109,7 +115,7 @@ async def test_diff_update_removes_and_adds_lines(settlement_db):
     saved = await services.save_ticket(WeighingTicketCreate.model_validate(payload(settlement_db)))
     data = edit_payload(saved)
     deleted = decode_id(data["lines"].pop()["id"])
-    data["lines"].append(dict(orderId=None, partNo="new", name="新增", unitWeight="2.123456", quantity=5))
+    data["lines"].append(dict(orderId=None, partNo="new", name="新增", netWeight="2.123456", grossWeight="3.123456", quantity=5))
     updated = await services.save_ticket(WeighingTicketUpdate.model_validate(data), decode_id(saved["id"]))
     assert updated["lines"][0]["id"] == saved["lines"][0]["id"]
     assert not await WeighingLine.filter(id=deleted).exists()
@@ -136,7 +142,7 @@ async def test_create_and_update_roll_back_on_line_failure(settlement_db, monkey
     assert await WeighingLine.all().count() == 2
     calls = 1
     changed = edit_payload(saved, weight="888.001")
-    changed["lines"] = [dict(orderId=None, partNo="new", name="新行", unitWeight="1", quantity=1)]
+    changed["lines"] = [dict(orderId=None, partNo="new", name="新行", netWeight="1", grossWeight="2", quantity=1)]
     with pytest.raises(RuntimeError):
         await services.save_ticket(WeighingTicketUpdate.model_validate(changed), decode_id(saved["id"]))
     assert await services.detail(decode_id(saved["id"])) == saved
@@ -149,7 +155,7 @@ async def test_http_lookup_validation_and_no_crud_bypass(settlement_db):
     register_exceptions(app)
     app.dependency_overrides[PermissionControl.has_permission] = lambda: None
     for number, part in [(1, "AB-partial"), (2, "AB"), (3, "AB")]:
-        await Order.create(order_no=f"O-{number}", part_no=part, name="test", unit_weight="1.123456")
+        await Order.create(order_no=f"O-{number}", part_no=part, name="test", net_weight="1.123456")
     async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
         options = await client.get("/settlement_rates/options")
         assert options.json()["data"][0]["processName"] == "喷漆"
@@ -199,7 +205,7 @@ async def test_concurrent_edits_allow_only_one_winner(settlement_db):
 async def test_invalid_lines_and_foreign_ids_are_rejected(settlement_db):
     from pydantic import ValidationError
 
-    for invalid in [dict(quantity=0), dict(quantity=1.5), dict(quantity=True), dict(unitWeight='0')]:
+    for invalid in [dict(quantity=0), dict(quantity=1.5), dict(quantity=True), dict(netWeight='0'), dict(grossWeight='0'), dict(grossWeight='-1'), dict(grossWeight='1.0000001'), dict(grossWeight='10000000000')]:
         data = payload(settlement_db)
         data['lines'][0].update(invalid)
         with pytest.raises(ValidationError):
@@ -231,10 +237,56 @@ async def test_mutations_require_backend_permission(settlement_db):
 @pytest.mark.asyncio(loop_scope="session")
 async def test_decimal_response_uses_fixed_precision_not_exponent_notation(settlement_db):
     data = payload(settlement_db, weight="1000.000")
-    data['lines'] = [dict(orderId=None, partNo='P', name='Power of ten', unitWeight='1.000000', quantity=1000)]
+    data['lines'] = [dict(orderId=None, partNo='P', name='Power of ten', netWeight='0.500000', grossWeight='1.000000', quantity=1000)]
     saved = await services.save_ticket(WeighingTicketCreate.model_validate(data))
     assert saved['weight'] == '1000.000'
     assert saved['price'] == '2.5000'
     assert saved['lines'][0]['theoreticalWeight'] == '1000.000000'
     assert saved['lines'][0]['allocatedWeight'] == '1000.000'
     assert saved['lines'][0]['amount'] == '2500.00'
+
+
+def test_allocation_uses_gross_weight_times_quantity_not_net_weight():
+    amount, lines = calculate(Decimal('100'), Decimal('2'), [
+        dict(net_weight=Decimal('9'), gross_weight=Decimal('1'), quantity=2),
+        dict(net_weight=Decimal('1'), gross_weight=Decimal('3'), quantity=2),
+    ])
+    assert [row['theoretical_weight'] for row in lines] == [Decimal('2'), Decimal('6')]
+    assert [row['allocated_weight'] for row in lines] == [Decimal('25'), Decimal('75')]
+    assert [row['amount'] for row in lines] == [Decimal('50'), Decimal('150')]
+    assert amount == Decimal('200')
+
+
+@pytest.mark.parametrize('gross', [None, Decimal('0'), Decimal('-1')])
+def test_allocation_rejects_missing_or_nonpositive_gross_weight(gross):
+    with pytest.raises(BizError, match='毛重'):
+        calculate(Decimal('100'), Decimal('2'), [dict(net_weight=Decimal('1'), gross_weight=gross, quantity=1)])
+
+
+@pytest.mark.asyncio(loop_scope='session')
+@pytest.mark.parametrize('historical_gross', [None, Decimal('0')])
+async def test_missing_historical_gross_weight_can_be_filled_once(settlement_db, historical_gross):
+    order = await Order.create(order_no='LEGACY', part_no='P', name='Legacy', net_weight='1', gross_weight='2')
+    data = payload(settlement_db)
+    data['lines'] = [dict(orderId=encode_id(order.id), quantity=2)]
+    saved = await services.save_ticket(WeighingTicketCreate.model_validate(data))
+    ticket_id = decode_id(saved['id'])
+    await WeighingLine.filter(ticket_id=ticket_id).update(gross_weight=historical_gross)
+    with pytest.raises(BizError, match='毛重'):
+        await services.settle_ticket(ticket_id, saved['revision'])
+    missing = await services.detail(ticket_id)
+    blank = edit_payload(missing)
+    blank['lines'][0]['grossWeight'] = None
+    with pytest.raises(BizError, match='毛重'):
+        await services.save_ticket(WeighingTicketUpdate.model_validate(blank), ticket_id)
+    edited = edit_payload(missing)
+    edited['lines'][0]['grossWeight'] = '3.123456'
+    updated = await services.save_ticket(WeighingTicketUpdate.model_validate(edited), ticket_id)
+    assert updated['lines'][0]['grossWeight'] == '3.123456'
+    assert updated['lines'][0]['theoreticalWeight'] == '6.246912'
+    edited = edit_payload(updated)
+    edited['lines'][0]['grossWeight'] = '9'
+    preserved = await services.save_ticket(WeighingTicketUpdate.model_validate(edited), ticket_id)
+    assert preserved['lines'][0]['grossWeight'] == '3.123456'
+    settled = await services.settle_ticket(ticket_id, preserved['revision'])
+    assert settled['isSettled'] is True

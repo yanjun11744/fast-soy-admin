@@ -64,10 +64,11 @@ const line = {
   orderNo: '',
   partNo: 'MANUAL',
   name: 'Manual item',
-  unitWeight: '1.000001',
+  netWeight: '1.000001',
+  grossWeight: '2.000002',
   quantity: 3,
   position: 1,
-  theoreticalWeight: '3.000003',
+  theoreticalWeight: '6.000006',
   allocatedWeight: '10.001',
   amount: '25.00',
   taxUnitPrice: '8.333333'
@@ -175,11 +176,11 @@ describe('Ticket aggregate editor', () => {
 
   it('debounces duplicate part numbers and requires choosing a concrete order without copying order quantity', async () => {
     vi.useFakeTimers();
-    const current = { orderId: null, orderNo: '', partNo: '', name: '', unitWeight: '', quantity: 0 };
+    const current = { orderId: null, orderNo: '', partNo: '', name: '', netWeight: '', quantity: 0 };
     vi.mocked(fetchSettlementOrderOptions).mockResolvedValue({
       data: [
-        { id: 'one', orderNo: 'O1', partNo: 'P', name: 'First', unitWeight: '1.000001' },
-        { id: 'two', orderNo: 'O2', partNo: 'P', name: 'Second', unitWeight: '2.000002' }
+        { id: 'one', orderNo: 'O1', partNo: 'P', name: 'First', netWeight: '1.000001' },
+        { id: 'two', orderNo: 'O2', partNo: 'P', name: 'Second', netWeight: '2.000002', grossWeight: '3.000003' }
       ],
       error: null
     } as never);
@@ -196,7 +197,8 @@ describe('Ticket aggregate editor', () => {
       orderId: 'two',
       orderNo: 'O2',
       name: 'Second',
-      unitWeight: '2.000002',
+      netWeight: '2.000002',
+      grossWeight: '3.000003',
       quantity: 0
     });
     await wrapper.findAll('button')[1].trigger('click');

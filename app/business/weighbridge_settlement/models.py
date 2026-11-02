@@ -175,10 +175,17 @@ class WeighingLine(BaseModel, AuditMixin):
         description="名称快照",
     )
 
-    unit_weight = fields.DecimalField(
+    net_weight = fields.DecimalField(
         max_digits=16,
         decimal_places=6,
-        description="机内单重快照/kg",
+        description="净重快照/kg",
+    )
+
+    gross_weight = fields.DecimalField(
+        max_digits=16,
+        decimal_places=6,
+        null=True,
+        description="毛重快照/kg",
     )
 
     # 本次实际过磅数量

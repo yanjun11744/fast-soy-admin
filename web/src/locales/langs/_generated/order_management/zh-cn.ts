@@ -5,7 +5,7 @@
 export default {
   route: {
     'order-management': '订单管理',
-    'order-management_order': '订单资料',
+    'order-management_order': '订单资料'
   },
   page: {
     order_management: {
@@ -15,7 +15,8 @@ export default {
         orderNo: '订单号',
         partNo: '项目号',
         name: '名称',
-        unitWeight: '机内单重/kg（净重）',
+        netWeight: '净重/kg',
+        grossWeight: '毛重/kg',
         unit: '单位',
         quantity: '数量',
         receivedQuantity: '入库数量',
@@ -28,7 +29,8 @@ export default {
           orderNo: '请输入订单号',
           partNo: '请输入项目号',
           name: '请输入名称',
-          unitWeight: '请输入机内单重/kg（净重）',
+          netWeight: '请输入净重/kg',
+          grossWeight: '请输入毛重/kg',
           unit: '请输入单位',
           quantity: '请输入数量',
           receivedQuantity: '请输入入库数量',
@@ -36,11 +38,11 @@ export default {
           orderDueDate: '请输入订单完工期',
           completedDate: '请输入实际完工期',
           processRoute: '请输入工艺路线',
-          customer: '请输入用户',
+          customer: '请输入用户'
         },
         addOrder: '新增订单资料',
         editOrder: '编辑订单资料'
-      },
-    },
-  },
+      }
+    }
+  }
 };

@@ -4,7 +4,7 @@
 export default {
   route: {
     'order-management': 'OrderManagement',
-    'order-management_order': 'Order',
+    'order-management_order': 'Order'
   },
   page: {
     order_management: {
@@ -14,7 +14,8 @@ export default {
         orderNo: 'orderNo',
         partNo: 'partNo',
         name: 'name',
-        unitWeight: 'unitWeight',
+        netWeight: 'Net weight/kg',
+        grossWeight: 'Gross weight/kg',
         unit: 'unit',
         quantity: 'quantity',
         receivedQuantity: 'receivedQuantity',
@@ -27,7 +28,8 @@ export default {
           orderNo: 'Please input orderNo',
           partNo: 'Please input partNo',
           name: 'Please input name',
-          unitWeight: 'Please input unitWeight',
+          netWeight: 'Please input net weight/kg',
+          grossWeight: 'Please input gross weight/kg',
           unit: 'Please input unit',
           quantity: 'Please input quantity',
           receivedQuantity: 'Please input receivedQuantity',
@@ -35,11 +37,11 @@ export default {
           orderDueDate: 'Please input orderDueDate',
           completedDate: 'Please input completedDate',
           processRoute: 'Please input processRoute',
-          customer: 'Please input customer',
+          customer: 'Please input customer'
         },
         addOrder: 'Add Order',
         editOrder: 'Edit Order'
-      },
-    },
-  },
+      }
+    }
+  }
 };

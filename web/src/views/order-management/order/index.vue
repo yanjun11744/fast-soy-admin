@@ -43,7 +43,8 @@ const { columns, columnChecks, data, loading, getData, getDataByPage, mobilePagi
     { key: 'orderNo', title: $t('page.order_management.order.orderNo'), align: 'center', minWidth: 120 },
     { key: 'partNo', title: $t('page.order_management.order.partNo'), align: 'center', minWidth: 120 },
     { key: 'name', title: $t('page.order_management.order.name'), align: 'center', minWidth: 120 },
-    { key: 'unitWeight', title: $t('page.order_management.order.unitWeight'), align: 'center', minWidth: 120 },
+    { key: 'netWeight', title: $t('page.order_management.order.netWeight'), align: 'center', minWidth: 120 },
+    { key: 'grossWeight', title: $t('page.order_management.order.grossWeight'), align: 'center', minWidth: 120 },
     { key: 'unit', title: $t('page.order_management.order.unit'), align: 'center', minWidth: 80 },
     { key: 'quantity', title: $t('page.order_management.order.quantity'), align: 'center', minWidth: 80 },
     { key: 'totalWeight', title: $t('page.order_management.order.totalWeight'), align: 'center', minWidth: 120 },
@@ -101,12 +102,13 @@ function edit(id: string) {
 
 <template>
   <div class="min-h-500px flex-col-stretch gap-16px overflow-hidden lt-sm:overflow-auto">
-    <OrderSearch
-      v-model:model="searchParams"
-      @reset="resetSearchParams"
-      @search="getDataByPage"
-    />
-    <NCard :title="$t('page.order_management.order.pageTitle')" :bordered="false" size="small" class="card-wrapper sm:flex-1-hidden">
+    <OrderSearch v-model:model="searchParams" @reset="resetSearchParams" @search="getDataByPage" />
+    <NCard
+      :title="$t('page.order_management.order.pageTitle')"
+      :bordered="false"
+      size="small"
+      class="card-wrapper sm:flex-1-hidden"
+    >
       <template #header-extra>
         <NSpace align="center" wrap>
           <ExcelTransfer
@@ -116,7 +118,6 @@ function edit(id: string) {
             :export-selected-api="ids => fetchExportOrder({ ...searchParams, ids })"
             :selected-ids="checkedRowKeys"
             :template-api="fetchOrderImportTemplate"
-
             @imported="getDataByPage(1)"
           />
           <TableHeaderOperation

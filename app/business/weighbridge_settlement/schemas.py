@@ -74,7 +74,8 @@ class WeighingLineInput(SchemaBase):
     order_no: str | None = Field(None, max_length=100)
     part_no: str = Field("", max_length=200)
     name: str = Field("", max_length=200)
-    unit_weight: Decimal | None = Field(None, gt=0, max_digits=16, decimal_places=6)
+    net_weight: Decimal | None = Field(None, gt=0, max_digits=16, decimal_places=6)
+    gross_weight: Decimal | None = Field(None, gt=0, max_digits=16, decimal_places=6)
     quantity: int = Field(gt=0, le=2147483647, strict=True)
 
 
@@ -120,7 +121,8 @@ class WeighingLineOut(SchemaBase):
     order_no: str | None
     part_no: str
     name: str
-    unit_weight: Decimal
+    net_weight: Decimal
+    gross_weight: Decimal | None
     quantity: int
     position: int
     theoretical_weight: Decimal
