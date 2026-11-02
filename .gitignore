@@ -31,6 +31,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Local image storage (keep uploaded binaries out of Git).
+/uploads/
+
 # ========================
 # Node / Frontend
 # ========================

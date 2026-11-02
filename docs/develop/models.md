@@ -1,5 +1,7 @@
 # 数据模型（System）
 
+本地图片配置、图片索引和生成器用法见 [图片上传与浏览](./image-upload.md)。
+
 系统模块的核心模型在 [`app/system/models/admin.py`](../../../app/system/models/admin.py) 与 [`app/system/models/dictionary.py`](../../../app/system/models/dictionary.py)。所有模型都继承 `BaseModel + AuditMixin`，外键 / 主键在 HTTP 边界自动编码为 [sqid](./sqids.md)。
 
 > 业务模块的模型放在 `app/business/<name>/models.py`。架构与字段约定可参考 [模型 Mixin](./mixins.md) 与本页业务模型示例。

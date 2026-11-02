@@ -76,7 +76,7 @@ def cn_title(description: str, fallback: str) -> str:
     """从 description 中提取中文标题：截断到第一个句号前。"""
     if not description:
         return fallback
-    text = description
+    text = re.sub(r"\[images?\]", "", description, flags=re.IGNORECASE)
     for sep in ("。", "."):
         if sep in text:
             text = text.split(sep)[0]
@@ -93,6 +93,8 @@ def en_title(field_name: str) -> str:
 
 def field_ts_type(f: FieldInfo) -> str:
     """返回 TS 类型字符串。"""
+    if f.image_kind and f.field_type == "JSONField":
+        return "string[]"
     mapping = {
         "CharField": "string",
         "TextField": "string",
@@ -115,6 +117,8 @@ def field_ts_type(f: FieldInfo) -> str:
 
 def field_form_component(f: FieldInfo) -> str:
     """返回表单组件类型标识: input / textarea / int / decimal / switch / date / datetime / select-status / select-todo。"""
+    if f.image_kind:
+        return "image-upload"
     if f.field_type == "TextField":
         return "textarea"
     if f.field_type in ("CharField",):
@@ -359,7 +363,17 @@ def _form_item_block(
     end = "      </NFormItem>"
 
     body: list[str]
-    if f.field_type == "JSONField":
+    if component == "image-upload":
+        shape = ' value-type="array"' if f.field_type == "JSONField" else ""
+        limit = 1 if f.image_kind == "single" else 5
+        body = [
+            "        <ImageUpload",
+            '          v-if="visible"',
+            f'          v-model:value="model.{name_camel}" :limit="{limit}"{shape}',
+            f'          :disabled="submitting" @update:busy="value => (uploading.{name_camel} = value)"',
+            "        />",
+        ]
+    elif f.field_type == "JSONField":
         body = [
             "        <NInput",
             f'          :value="formatJsonInput(model.{name_camel})"',
@@ -431,6 +445,8 @@ def _form_item_block(
 
 def _default_value_for_field(f: FieldInfo) -> str:
     """用于 createDefaultModel() 的字段默认值。"""
+    if f.image_kind:
+        return "[]" if f.field_type == "JSONField" else "''"
     if f.field_type in ("DatetimeField", "DateField", "TimeField"):
         return "null"
     if f.field_type in ("CharField", "TextField", "UUIDField"):
@@ -497,6 +513,9 @@ def gen_view_index(
                 col_lines.append(f"    {{ key: '{camel}', title: $t('{i18n_page}.{relation_label_key(r)}'), align: 'center', minWidth: 120 }},")
             continue
         camel = snake_to_camel(f.name)
+        if f.image_kind:
+            col_lines.append(f"    {{ key: '{camel}', title: $t('{i18n_page}.{camel}'), align: 'center', minWidth: 120, render: row => <ImagePreview value={{row.{camel}}} /> }},")
+            continue
         col_lines.append(f"    {{ key: '{camel}', title: $t('{i18n_page}.{camel}'), align: 'center', minWidth: 120 }},")
 
     search_field_names = search_field_names or []
@@ -612,6 +631,7 @@ def gen_view_index(
 import {{ {", ".join(vue_imports)} }} from 'vue';
 import {{ NButton, NPopconfirm }} from 'naive-ui';
 import ExcelTransfer from '@/components/advanced/excel-transfer.vue';
+{"import ImagePreview from '@/components/advanced/image-preview.vue';" if any(f.image_kind and f.name in list_fields for f in fields) else ""}
 import {{
   fetchBatchDelete{entity}, fetchDelete{entity}, fetchGet{entity}List,
   fetchExport{entity}, fetchImport{entity}, fetchPreviewImport{entity}, fetch{entity}ImportTemplate
@@ -960,13 +980,22 @@ def gen_view_drawer(module: str, model: ModelInfo) -> str:
     needs_status_import = any(f.enum_type == "StatusType" for f in fields)
 
     extra_imports: list[str] = []
+    image_fields = [f for f in fields if f.image_kind]
+    if image_fields:
+        extra_imports.append("import ImageUpload from '@/components/advanced/image-upload.vue';")
+    upload_state = (
+        ("const uploading = ref<Record<string, boolean>>({});\nconst submitting = ref(false);\nconst uploadBusy = computed(() => Object.values(uploading.value).some(Boolean));")
+        if image_fields
+        else ""
+    )
+    submit_guard = "  if (submitting.value || uploadBusy.value) return;" if image_fields else ""
     if needs_status_import:
         extra_imports.append("import { statusTypeOptions } from '@/constants/business';")
 
     entity_title_key = f"{i18n_page}.pageTitle"
     add_key = f"{i18n_page}.add{entity}"
     edit_key = f"{i18n_page}.edit{entity}"
-    needs_json_helpers = any(f.field_type == "JSONField" for f in fields)
+    needs_json_helpers = any(f.field_type == "JSONField" and not f.image_kind for f in fields)
     form_hook_imports = "useFormRules, useNaiveForm" if required_rules else "useNaiveForm"
     form_rules_setup = "const { defaultRequiredRule } = useFormRules();" if required_rules else ""
     rules_block = (
@@ -1047,6 +1076,7 @@ const title = computed(() => {{
 }});
 
 const model = ref(createDefaultModel());
+{upload_state}
 
 function createDefaultModel(): Api.{ns}.{entity}AddParams {{
   return {{
@@ -1069,7 +1099,9 @@ function closeDrawer() {{
 }}
 
 async function handleSubmit() {{
+{submit_guard}
   await validate();
+{"  if (submitting.value || uploadBusy.value) return;\n  submitting.value = true;\n  try {" if image_fields else ""}
   if (props.operateType === 'add') {{
     const {{ error }} = await fetchAdd{entity}(model.value);
     if (error) return;
@@ -1081,6 +1113,7 @@ async function handleSubmit() {{
   }}
   closeDrawer();
   emit('submitted');
+{"  } finally { submitting.value = false; }" if image_fields else ""}
 }}
 
 watch(visible, () => {{
@@ -1100,7 +1133,7 @@ watch(visible, () => {{
       <template #footer>
         <NSpace :size="16">
           <NButton @click="closeDrawer">{{{{ $t('common.cancel') }}}}</NButton>
-          <NButton type="primary" @click="handleSubmit">{{{{ $t('common.confirm') }}}}</NButton>
+          <NButton type="primary"{' :loading="submitting" :disabled="uploadBusy"' if image_fields else ""} @click="handleSubmit">{{{{ $t('common.confirm') }}}}</NButton>
         </NSpace>
       </template>
     </NDrawerContent>

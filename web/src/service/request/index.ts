@@ -96,6 +96,7 @@ export const request = createFlatRequest(
       return null;
     },
     onError(error) {
+      if (error.code === 'ERR_CANCELED') return;
       // when the request is fail, you can show error message
 
       let message = error.message;
