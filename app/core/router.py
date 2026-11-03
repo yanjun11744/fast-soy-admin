@@ -461,6 +461,15 @@ class CRUDRouter:
                 self.action_dependencies[action] = self.action_dependencies.get(fallback, [])
         headers, _ = config.resolve(schema)
         controller = self.controller
+        update_schema = self.update_schema
+        if config.update_key is not None:
+            key_field = controller.model._meta.fields_map.get(config.update_key)
+            if key_field is None or not key_field.unique or key_field.null or key_field.pk:
+                raise ValueError("Excel update_key must be a unique non-null model field other than the primary key")
+            if "update" not in self.enable_routes or self.update_schema is None:
+                raise ValueError("Excel update_key requires an enabled update route and update_schema")
+            if not set(config.fields) <= self.update_schema.model_fields.keys():
+                raise ValueError("Excel update fields must belong to update_schema")
 
         async def download_template() -> Success:
             content = await run_in_threadpool(write_excel, headers, [])
@@ -492,7 +501,13 @@ class CRUDRouter:
             async with in_transaction(get_db_conn(controller.model)):
                 for row_number, item in result.rows:
                     try:
-                        await controller.create(obj_in=item)
+                        existing = await controller.get_or_none(**{config.update_key: getattr(item, config.update_key)}) if config.update_key is not None else None
+                        if existing is not None and update_schema is not None:
+                            # Blank cells stay unset, so existing values and creation audit survive.
+                            update = update_schema.model_validate(item.model_dump(exclude_unset=True, exclude_none=True))
+                            await controller.update(id=existing.pk, obj_in=update)
+                        else:
+                            await controller.create(obj_in=item)
                     except IntegrityError as exc:
                         raise BizError(Code.DUPLICATE_RESOURCE, f"第 {row_number} 行违反唯一键或外键约束，导入已全部回滚") from exc
             return Success(msg="导入成功", data={"importedCount": len(result.rows)})

@@ -40,6 +40,7 @@ class ExcelConfig:
 
     fields: tuple[str, ...]
     columns: Mapping[str, ExcelColumn] = field(default_factory=dict)
+    update_key: str | None = None
 
     def resolve(self, schema: type[BaseModel]) -> tuple[list[str], dict[str, str]]:
         """Compile one unambiguous name registry shared by templates and imports."""
@@ -49,6 +50,8 @@ class ExcelConfig:
             raise ValueError("Excel supports at most 200 fields")
         if not self.columns.keys() <= set(self.fields):
             raise ValueError("Excel columns must belong to configured fields")
+        if self.update_key is not None and (self.update_key not in self.fields or not schema.model_fields[self.update_key].is_required()):
+            raise ValueError("Excel update_key must be a required configured field")
         headers: list[str] = []
         aliases: dict[str, str] = {}
         for name in self.fields:

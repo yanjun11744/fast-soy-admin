@@ -17,6 +17,7 @@ order_crud = CRUDRouter(
     controller=order_controller,
     create_schema=OrderCreate,
     excel=ExcelConfig(
+        update_key="order_no",
         fields=(
             "order_no",
             "part_no",
@@ -31,7 +32,7 @@ order_crud = CRUDRouter(
             "completed_date",
             "process_route",
             "customer",
-        )
+        ),
     ),
     update_schema=OrderUpdate,
     list_schema=OrderSearch,
