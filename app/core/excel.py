@@ -40,6 +40,8 @@ class ExcelConfig:
 
     fields: tuple[str, ...]
     columns: Mapping[str, ExcelColumn] = field(default_factory=dict)
+    # None keeps create-only imports; "id" enables Sqid round trips.
+    update_key: str | None = None
 
     def resolve(self, schema: type[BaseModel]) -> tuple[list[str], dict[str, str]]:
         """Compile one unambiguous name registry shared by templates and imports."""

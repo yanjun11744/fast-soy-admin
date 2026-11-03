@@ -150,7 +150,7 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
     lines = [
         "import { request } from '../request';",
         "import { createExcelFormData } from '@/utils/excel';",
-        "import type { ExcelDownload, ExcelImportOptions, ExcelPreview } from '@/utils/excel';",
+        "import type { ExcelDownload, ExcelImportOptions, ExcelImportResult, ExcelPreview } from '@/utils/excel';",
         "",
     ]
     for model in models:
@@ -223,7 +223,7 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
             "",
             f"export function fetchImport{entity}(file: File, options?: ExcelImportOptions) {{",
             "  const data = createExcelFormData(file, options);",
-            f"  return request<{{ importedCount: number }}>({{ url: '{url_base}/import', method: 'post', data, headers: {{ 'Content-Type': 'multipart/form-data' }}, timeout: 120000 }});",
+            f"  return request<ExcelImportResult>({{ url: '{url_base}/import', method: 'post', data, headers: {{ 'Content-Type': 'multipart/form-data' }}, timeout: 120000 }});",
             "}",
             "",
             f"void {entity_snake};",  # placeholder to avoid unused var warning; removed below

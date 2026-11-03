@@ -2,9 +2,10 @@ import { defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { ExcelPreview } from '@/utils/excel';
+import { $t } from '@/locales';
 import ExcelImportPreview from '../excel-import-preview.vue';
 
-vi.mock('@/locales', () => ({ $t: (key: string) => key }));
+vi.mock('@/locales', () => ({ $t: vi.fn((key: string) => key) }));
 
 const container = defineComponent({ template: '<div><slot /></div>' });
 const button = defineComponent({
@@ -69,6 +70,28 @@ async function setup(data = preview()) {
 }
 
 describe('Excel import preview', () => {
+  it.each([
+    [
+      { importedCount: 5, createdCount: 2, updatedCount: 3 },
+      { created: 2, updated: 3 }
+    ],
+    [
+      { importedCount: 5, createdCount: 0, updatedCount: 5 },
+      { created: 0, updated: 5 }
+    ],
+    [{ importedCount: 5 }, { created: 5, updated: 0 }]
+  ])('shows separate created and updated counts', async (result, counts) => {
+    const success = vi.fn();
+    window.$message = { success } as never;
+    const { wrapper, importApi, action } = await setup();
+    importApi.mockResolvedValue({ data: result, error: null });
+    vi.mocked($t).mockClear();
+    await action('excelConfirmImport').trigger('click');
+    await flushPromises();
+    expect($t).toHaveBeenCalledWith('common.excelImportSuccess', counts);
+    expect(success).toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('submits the validated selection and emits completion', async () => {
     const { wrapper, importApi, action } = await setup();
     expect(action('excelConfirmImport').attributes('disabled')).toBeUndefined();

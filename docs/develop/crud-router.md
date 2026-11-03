@@ -294,7 +294,7 @@ crud = CRUDRouter(
     create_schema=CustomerCreate,
     update_schema=CustomerUpdate,
     list_schema=CustomerSearch,
-    excel=ExcelConfig(fields=("name", "phone")),
+    excel=ExcelConfig(fields=("name", "phone"), update_key="id"),
 )
 ```
 
@@ -307,7 +307,7 @@ crud = CRUDRouter(
 | `POST /customers/import` | multipart 上传，字段名为 `file`；提交时重新校验 |
 | `POST /customers/export` | 使用列表搜索条件筛选；可附加 `ids` 导出所选记录，忽略当前页码和每页数量 |
 
-模板、导出接口通过 `Success(data={"filename": "...xlsx", "content": "Base64..."})` 返回文件，前端 `ExcelTransfer` 组件配合 `downloadExcel` 下载，沿用统一请求、鉴权和 Token 刷新流程。导入成功返回 `Success(data={"importedCount": N})`，页面刷新第一页。
+模板、导出接口通过 `Success(data={"filename": "...xlsx", "content": "Base64..."})` 返回文件，前端 `ExcelTransfer` 组件配合 `downloadExcel` 下载，沿用统一请求、鉴权和 Token 刷新流程。导入成功返回 `Success(data={"importedCount": N, "createdCount": C, "updatedCount": U})`，其中 N = C + U，按处理行数计数。直接导入和预览确认导入均提示“新增成功 C 条，更新成功 U 条”，随后刷新第一页。旧后端仅返回 `importedCount` 时，前端将其视为新增条数、更新条数为 0。
 
 导出请求沿用搜索字段，额外支持 `ids?: SqidId[]`：省略或传 `null` 导出全部匹配记录；传数组时仅导出所选 ID 与当前筛选、`data_policy`、`excel_scope_filter` 的交集。空数组、非法 ID 或超过 10000 个 ID 均拒绝，不会回退为全量导出。所选记录仍按列表排序，重复 ID 不会重复导出，已删除或不可见记录不会出现在结果中。
 
@@ -328,10 +328,20 @@ crud = CRUDRouter(
 - 导入表头只与字段名、Schema alias、Schema title、Excel title 和显式别名精确匹配。不去空格、不忽略大小写、不转换全半角、不做模糊推荐。不同字段的名称或别名冲突时，路由初始化直接报错。
 - 自动扫描前 100 行，通过必填字段命中数和全部字段命中数识别唯一表头候选；不能唯一确定时必须指定 `headerRow`。多工作表必须选择 `sheet`，不会自动合并。
 - 空行跳过、空单元格按未提供处理；必填字段仍由创建 Schema 校验。未精确匹配的列默认忽略，也可在预览中手动指定目标字段；多列映射到同一个字段时阻止导入。
-- 导入只创建记录，不按 ID 覆盖已有记录。先校验整张表，再在模型所在数据库事务中逐条调用 `controller.create`，保留创建审计；唯一键、外键冲突会全部回滚。失败提示行号和字段，不回显单元格数据。
+- 不指定 `update_key` 时只创建记录；设置后支持更新或新增。先校验整张表，再在模型所在数据库事务中逐条调用 `controller.create` / `controller.update`，保留创建审计并记录更新人；唯一键、外键或更新字段校验失败会全部回滚。失败提示行号和字段，不回显单元格数据。空单元格、未映射字段不覆盖原值，`0`、`false` 等非空值正常更新。即使更新也需提供创建模板要求的必填字段。同一文件重复匹配到同一记录时按行顺序更新，后行提供的值生效，每次更新计为一条。
 - JSON 字段使用 JSON 文本；日期时间使用 ISO 格式；外键沿用 Sqid 字符串；大整数与 Decimal 以文本保存，避免 Excel 精度丢失。上传中的公式拒绝导入；导出的公式形文本以字符串存储。
-- Excel 字段只能来自 `create_schema` 的显式白名单，不能包含 `exclude_fields`；生成器自动排除这些字段。不要将密码、Token 等敏感字段配置到白名单。
+- Excel 字段只能来自 `create_schema` 的显式白名单，不能包含 `exclude_fields`；生成器自动排除这些字段。ID 更新模式会额外添加只用于定位的可选 Sqid `ID` 列，不写入主键。不要将密码、Token 等敏感字段配置到白名单。
 - 未开启 `excel` 的现有 CRUD 不会新增任何接口。禁用 `create` 时不注册导入、预览和模板接口；禁用 `list` 时不注册导出接口。
+
+### 生成模块默认支持更新
+
+生成器从允许导入的字段中选择**唯一一个必填且带 `unique=True` 的业务字段**，生成 `update_key="code"` 之类的配置。业务字段匹配到记录时更新，未匹配时新增。例如唯一订单号可使用 `update_key="order_no"`。不自动猜测联合唯一约束，也不从多个唯一字段中任取一个。
+
+没有唯一候选或存在多个候选时，默认生成 `update_key="id"`：模板、预览字段和导出文件自动包含可选 `ID` 列。新增行留空；更新时保留导出文件中的 Sqid ID。填写不存在的 ID 会整批失败，不会按该 ID 新建或降级为新增。ID 和业务匹配字段都必须精确匹配。
+
+开启更新必须提供 `update_schema` 并启用 `update` 路由，所有业务导入字段必须属于更新 Schema。业务匹配字段还必须是创建 Schema 的必填字段、模型中唯一且非空的非主键字段。禁用更新路由时生成器保留只新增；若无唯一业务候选且明确排除了 ID，也保留只新增。现有模块需手工添加 `update_key` 或重新生成，不会自动改变匹配规则。
+
+更新受 `data_policy` 与 `excel_scope_filter` 的范围交集约束，范围外的记录不能通过导入更新。导入权限同时允许其已配置的更新行为，授权导入按钮/API 时应按此能力分配；现有权限种子不会被自动修改。预览仍只做文件识别和字段校验，不写数据库，提交时重新检查记录存在性、更新校验和数据范围。
 
 ### 中文表头与精确别名
 

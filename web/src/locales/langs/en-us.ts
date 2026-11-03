@@ -60,7 +60,7 @@ const local: App.I18n.BaseSchema = {
     excelExportSelected: 'Export selected ({count})',
     excelTemplate: 'Download import template',
     excelFileLimit: 'Upload an .xlsx file no larger than 5MB',
-    excelImportSuccess: 'Imported {count} records',
+    excelImportSuccess: 'Created {created} records, updated {updated} records',
     action: 'Action',
     add: 'Add',
     addSuccess: 'Add Success',

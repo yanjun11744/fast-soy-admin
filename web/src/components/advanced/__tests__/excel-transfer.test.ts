@@ -2,10 +2,11 @@ import { defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { downloadExcel } from '@/utils/excel';
+import { $t } from '@/locales';
 import ExcelTransfer from '../excel-transfer.vue';
 
 vi.mock('@/locales', () => ({
-  $t: (key: string, params?: { count: number }) => `${key}${params ? `:${params.count}` : ''}`
+  $t: vi.fn((key: string, params?: { count: number }) => `${key}${params ? `:${params.count}` : ''}`)
 }));
 vi.mock('@/utils/excel', () => ({ downloadExcel: vi.fn() }));
 
@@ -42,6 +43,35 @@ function setup(selectedIds: string[] = [], legacy = false) {
 }
 
 describe('Excel export selection', () => {
+  it.each([
+    [
+      { importedCount: 5, createdCount: 2, updatedCount: 3 },
+      { created: 2, updated: 3 }
+    ],
+    [{ importedCount: 5 }, { created: 5, updated: 0 }]
+  ])('shows import counts without the preview flow', async (result, counts) => {
+    const upload = defineComponent({ name: 'NUpload', props: ['customRequest'], template: '<div />' });
+    window.$message = { success: vi.fn() } as never;
+    const wrapper = mount(ExcelTransfer, {
+      props: {
+        importApi: vi.fn().mockResolvedValue({ data: result, error: null }),
+        templateApi: vi.fn(),
+        exportApi: vi.fn()
+      },
+      global: { stubs: { NSpace: container, NButton: button, NUpload: upload, NDropdown: dropdown } }
+    });
+    const onFinish = vi.fn();
+    vi.mocked($t).mockClear();
+    await wrapper.findComponent(upload).props('customRequest')({
+      file: { file: new File(['test'], 'test.xlsx') },
+      onFinish,
+      onError: vi.fn()
+    });
+    expect($t).toHaveBeenCalledWith('common.excelImportSuccess', counts);
+    expect(onFinish).toHaveBeenCalled();
+    expect(wrapper.emitted('imported')).toHaveLength(1);
+    wrapper.unmount();
+  });
   it('exports selected IDs separately from filtered results and reacts to selection changes', async () => {
     const { wrapper, exportApi, exportSelectedApi } = setup(['first', 'second']);
     const selected = () =>

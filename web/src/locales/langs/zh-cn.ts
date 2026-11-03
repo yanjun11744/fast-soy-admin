@@ -60,7 +60,7 @@ const local: App.I18n.BaseSchema = {
     excelExportSelected: '导出所选（{count} 条）',
     excelTemplate: '下载导入模板',
     excelFileLimit: '仅支持 5MB 以内的 .xlsx 文件',
-    excelImportSuccess: '成功导入 {count} 条数据',
+    excelImportSuccess: '新增成功 {created} 条，更新成功 {updated} 条',
     action: '操作',
     add: '新增',
     addSuccess: '添加成功',

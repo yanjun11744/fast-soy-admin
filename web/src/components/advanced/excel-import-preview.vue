@@ -70,7 +70,12 @@ async function importFile() {
   try {
     const { data, error } = await props.importApi(props.file, selection());
     if (error || !data) return;
-    window.$message?.success($t('common.excelImportSuccess', { count: data.importedCount }));
+    window.$message?.success(
+      $t('common.excelImportSuccess', {
+        created: data.createdCount ?? data.importedCount - (data.updatedCount ?? 0),
+        updated: data.updatedCount ?? 0
+      })
+    );
     emit('imported');
     emit('close');
   } finally {

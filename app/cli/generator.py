@@ -443,7 +443,12 @@ def gen_api_manage(
         excel_fields = [f.name for f in m.schema_fields if f.name not in excluded]
         excel_fields.extend(f"{r.name}_id" for r in m.relations if r.relation_type in ("ForeignKeyField", "OneToOneField") and f"{r.name}_id" not in excluded)
         if excel_fields:
-            lines.append(f"    excel=ExcelConfig(fields={tuple(excel_fields)!r}),")
+            routes = backend_options.enable_routes.get(m.name)
+            update_enabled = routes is None or "update" in routes
+            unique_fields = [f.name for f in m.schema_fields if f.unique and f.required and f.name in excel_fields]
+            update_key = unique_fields[0] if len(unique_fields) == 1 else "id"
+            update_option = f", update_key={update_key!r}" if update_enabled and (update_key != "id" or "id" not in excluded) else ""
+            lines.append(f"    excel=ExcelConfig(fields={tuple(excel_fields)!r}{update_option}),")
             if scope:
                 lines.append(f"    excel_scope_filter=_{m.snake_name}_excel_scope,")
 

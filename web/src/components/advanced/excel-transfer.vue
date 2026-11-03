@@ -79,7 +79,12 @@ async function upload(options: UploadCustomRequestOptions) {
       options.onError();
       return;
     }
-    window.$message?.success($t('common.excelImportSuccess', { count: data.importedCount }));
+    window.$message?.success(
+      $t('common.excelImportSuccess', {
+        created: data.createdCount ?? data.importedCount - (data.updatedCount ?? 0),
+        updated: data.updatedCount ?? 0
+      })
+    );
     options.onFinish();
     emit('imported');
   } catch {
