@@ -267,6 +267,7 @@ def gen_all(
         list_fields_map=list_fields,
         search_fields_map=search_fields,
         button_auth_models=backend_options.button_auth_models,
+        backend_options=backend_options,
         force=force,
         dry_run=dry_run,
     )

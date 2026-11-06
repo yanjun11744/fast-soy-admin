@@ -1,13 +1,15 @@
 """Bounded XLSX conversion. Only explicitly configured schema fields cross this boundary."""
 
-from collections.abc import Iterator, Mapping
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal
 from enum import Enum
 from io import BytesIO
-from typing import Any, get_args, get_origin
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 from zipfile import ZipFile
 
 import orjson
@@ -19,6 +21,9 @@ from pydantic import BaseModel, Field, ValidationError
 from app.core.base_schema import SchemaBase
 from app.core.code import Code
 from app.core.exceptions import BizError
+
+if TYPE_CHECKING:
+    from app.core.router import CRUDRouter
 
 MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_ROWS = 10000
@@ -35,6 +40,15 @@ class ExcelColumn:
 
 
 @dataclass(frozen=True)
+class ExcelDetail:
+    """A declared child resource; the lazy reference permits either declaration order."""
+
+    sheet_name: str
+    resource: Callable[[], CRUDRouter]
+    parent_field: str
+
+
+@dataclass(frozen=True)
 class ExcelConfig:
     """Opt in for simple CRUD resources. Fields are schema names, never arbitrary model fields."""
 
@@ -42,6 +56,7 @@ class ExcelConfig:
     columns: Mapping[str, ExcelColumn] = field(default_factory=dict)
     # None keeps create-only imports; "id" enables Sqid round trips.
     update_key: str | None = None
+    details: tuple[ExcelDetail, ...] = ()
 
     def resolve(self, schema: type[BaseModel]) -> tuple[list[str], dict[str, str]]:
         """Compile one unambiguous name registry shared by templates and imports."""
@@ -109,37 +124,54 @@ class ExcelImportResult:
 
 
 def write_excel(headers: list[str], records: list[list[Any]]) -> bytes:
-    converted_rows: list[list[Any]] = []
-    for row in [headers, *records]:
-        converted = []
-        for value in row:
-            if isinstance(value, Enum):
-                value = value.value
-            if isinstance(value, (dict, list)):
-                value = orjson.dumps(value).decode()
-            elif isinstance(value, (datetime, date, time, Decimal)):
-                value = str(value)
-            elif isinstance(value, int) and not isinstance(value, bool) and abs(value) >= 10**15:
-                value = str(value)
-            if isinstance(value, str) and (len(value) > 32767 or ILLEGAL_CHARACTERS_RE.search(value)):
-                raise BizError(Code.REQUEST_VALIDATION, "数据超过 Excel 单元格长度限制或包含不支持的字符")
-            converted.append(value)
-        converted_rows.append(converted)
+    return write_excel_sheets([("Data", headers, records)])
+
+
+def write_excel_sheets(sheets: Sequence[tuple[str, list[str], list[list[Any]]]]) -> bytes:
+    """Validate all cells before streaming any sheets, retaining the single-sheet text rules."""
+    converted_sheets: list[tuple[str, list[list[Any]]]] = []
+    names: set[str] = set()
+    for title, headers, records in sheets:
+        if not title or len(title) > 31 or any(char in title for char in r"\/*?:[]") or title.casefold() in names:
+            raise ValueError("Excel sheet names must be unique, valid and at most 31 characters")
+        names.add(title.casefold())
+        if len(headers) > MAX_COLUMNS or len(records) > MAX_ROWS:
+            raise BizError(Code.REQUEST_VALIDATION, f"每张工作表最多 {MAX_ROWS} 行、{MAX_COLUMNS} 列，请缩小导出范围")
+        converted_rows: list[list[Any]] = []
+        for row in [headers, *records]:
+            converted = []
+            for value in row:
+                if isinstance(value, Enum):
+                    value = value.value
+                if isinstance(value, (dict, list)):
+                    value = orjson.dumps(value).decode()
+                elif isinstance(value, (datetime, date, time, Decimal)):
+                    value = str(value)
+                elif isinstance(value, int) and not isinstance(value, bool) and abs(value) >= 10**15:
+                    value = str(value)
+                if isinstance(value, str) and (len(value) > 32767 or ILLEGAL_CHARACTERS_RE.search(value)):
+                    raise BizError(Code.REQUEST_VALIDATION, "数据超过 Excel 单元格长度限制或包含不支持的字符")
+                converted.append(value)
+            converted_rows.append(converted)
+        converted_sheets.append((title, converted_rows))
     workbook = Workbook(write_only=True)
-    sheet = workbook.create_sheet("Data")
-    for row in converted_rows:
-        cells = []
-        for value in row:
-            cell = WriteOnlyCell(sheet, value=value)
-            # Text must stay text, including formula-looking values and long IDs.
-            if isinstance(value, str):
-                cell.data_type = "s"
-            cells.append(cell)
-        sheet.append(cells)
-    output = BytesIO()
-    workbook.save(output)
-    workbook.close()
-    return output.getvalue()
+    try:
+        for title, rows in converted_sheets:
+            sheet = workbook.create_sheet(title)
+            for row in rows:
+                cells = []
+                for value in row:
+                    cell = WriteOnlyCell(sheet, value=value)
+                    # Text must stay text, including formula-looking values and long IDs.
+                    if isinstance(value, str):
+                        cell.data_type = "s"
+                    cells.append(cell)
+                sheet.append(cells)
+        output = BytesIO()
+        workbook.save(output)
+        return output.getvalue()
+    finally:
+        workbook.close()
 
 
 @contextmanager

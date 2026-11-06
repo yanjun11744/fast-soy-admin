@@ -383,6 +383,9 @@ declare namespace App {
         excelExport: string;
         excelExportFiltered: string;
         excelExportSelected: string;
+        excelDetailExport: string;
+        excelParentFields: string;
+        excelParentFieldsHint: string;
         excelTemplate: string;
         excelFileLimit: string;
         excelImportSuccess: string;

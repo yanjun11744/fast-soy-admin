@@ -333,6 +333,43 @@ crud = CRUDRouter(
 - Excel 字段只能来自 `create_schema` 的显式白名单，不能包含 `exclude_fields`；生成器自动排除这些字段。ID 更新模式会额外添加只用于定位的可选 Sqid `ID` 列，不写入主键。不要将密码、Token 等敏感字段配置到白名单。
 - 未开启 `excel` 的现有 CRUD 不会新增任何接口。禁用 `create` 时不注册导入、预览和模板接口；禁用 `list` 时不注册导出接口。
 
+### 父子表导出与可选父表字段
+
+同一次生成中同时选择父模型和子模型（例如 `--models Order,OrderLine`），生成器会识别同模块内指向父模型的 `ForeignKeyField` / `OneToOneField`，为父表的 `ExcelConfig.details` 自动添加子表。支持多个子表、同一子表指向父表的多个关系；不推断普通整数 ID、自关联、跨模块关系或多对多关系。子模型必须启用列表且有可导出的字段。CLI `gen` 生成后端配置，`gen-web` 生成选择界面，`crud` / `gen-all` 同时生成两端。
+
+生成的父表“导出筛选结果”或“导出所选”会先显示父表字段选择框。默认勾选允许导出的业务字段，可取消部分字段，也可全部取消。Excel 保留完整 `Data` 父表工作表，每个直接子表单独一张工作表，按父表导出顺序分组、组内沿用子表列表排序；所选父表字段重复写入每条子表明细，表头加 `父表：` 前缀以区别子表同名列。没有明细时仍保留表头。
+
+请求新增 `parentFields?: string[] | null`，值为父表 Excel 白名单中的内部字段名，例如 `['order_no', 'weighing_date']`。省略或 `null` 附带所有父表导出字段，`[]` 不附带父表字段；未知、排除或重复字段均拒绝，不接受任意模型字段。此选择不改变 `Data` 工作表或导入模板。父表及每张子表分别最多 10000 行、合并父子列最多 200 列，超限返回错误，不生成部分文件。
+
+已有模块可手工接入，保留原业务逻辑：
+
+```python
+from app.utils import ExcelConfig, ExcelDetail
+
+# order_line_crud 是该子表已有的 CRUDRouter；延迟引用允许它在父表之后声明。
+order_excel = ExcelConfig(
+    fields=("order_no", "customer"),
+    details=(ExcelDetail(sheet_name="订单明细", resource=lambda: order_line_crud, parent_field="order_id"),),
+)
+# 在父表 CRUDRouter 中传入 excel=order_excel。
+```
+
+```vue
+<ExcelTransfer
+  :export-parent-fields="[{ name: 'order_no', label: '订单号' }, { name: 'customer', label: '客户' }]"
+  :export-api="parentFields => fetchExportOrder({ ...searchParams, parentFields })"
+  :export-selected-api="(ids, parentFields) => fetchExportOrder({ ...searchParams, ids, parentFields })"
+  :selected-ids="checkedRowKeys"
+  :import-api="fetchImportOrder"
+  :preview-api="fetchPreviewImportOrder"
+  :template-api="fetchOrderImportTemplate"
+/>
+```
+
+父表筛选、所选 ID、数据范围仍取交集；子表通过其真实外键限定在结果父表内，并复用子表的 Excel 字段白名单、`exclude_fields`、`data_policy`、`excel_scope_filter`、默认 Manager（包括已配置的软删过滤）和 `record_transform`。父表导出权限覆盖显式声明的子表数据，应按聚合导出能力分配权限。自定义列表的约束必须同时接入对应的 `excel_scope_filter`，不会调用自定义导出覆盖函数。独立使用 `gen-web` 时可传 `--exclude-fields Order:secret`，与后端白名单保持一致；`crud` 自动共享后端排除配置。
+
+子表工作表为只读导出，不增加父子表聚合导入。导回父表时需在导入预览中选择 `Data`。已生成的模块不会自动新增此能力，应按需手工接入；重新生成前先备份自定义业务代码。
+
 ### 生成模块默认支持更新
 
 生成器从允许导入的字段中选择**唯一一个必填且带 `unique=True` 的业务字段**，生成 `update_key="code"` 之类的配置。业务字段匹配到记录时更新，未匹配时新增。例如唯一订单号可使用 `update_key="order_no"`。不自动猜测联合唯一约束，也不从多个唯一字段中任取一个。

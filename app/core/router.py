@@ -14,7 +14,8 @@ from tortoise.transactions import in_transaction
 from app.core.base_schema import CommonIds, Success, SuccessExtra
 from app.core.code import Code
 from app.core.crud import CRUDBase, get_db_conn
-from app.core.excel import MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, ExcelImportOptions, ExcelImportResult, parse_excel, write_excel
+from app.core.excel import MAX_COLUMNS, MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, ExcelImportOptions, ExcelImportResult, parse_excel, write_excel, write_excel_sheets
+from app.core.excel_export import detail_sheets, export_record
 from app.core.exceptions import BizError
 from app.core.sqids import encode_id
 from app.core.types import SqidId, SqidPath
@@ -551,6 +552,7 @@ class CRUDRouter:
             f"{self.list_schema.__name__}Export",
             __base__=self.list_schema,
             ids=(list[SqidId] | None, Field(default=None, min_length=1, max_length=MAX_ROWS, title="所选记录 ID")),
+            parent_fields=(list[str] | None, Field(default=None, max_length=MAX_COLUMNS, title="子表附带的父表字段")),
         )
 
         async def export_excel(obj_in: export_schema, request: Request) -> Success:  # type: ignore[valid-type]
@@ -569,17 +571,11 @@ class CRUDRouter:
             total, objects = await controller.list(page=1, page_size=MAX_ROWS + 1, search=q, order=order)
             if total > MAX_ROWS or len(objects) > MAX_ROWS:
                 raise BizError(Code.REQUEST_VALIDATION, f"导出最多 {MAX_ROWS} 行，请缩小筛选范围")
-            records = []
-            for obj in objects:
-                if self.record_transform:
-                    record = await self._to_record(obj)
-                    records.append([record.get(schema.model_fields[name].alias or name) for name in config.fields])
-                else:
-                    # Schema serializers preserve Sqid FK IDs, decimals and ISO dates.
-                    values = {name: getattr(obj, name) for name in config.fields}
-                    record = schema.model_construct(**values).model_dump(mode="json", include=set(config.fields))
-                    records.append([record.get(name) for name in config.fields])
-            content = await run_in_threadpool(write_excel, headers, records)
+            records = [await export_record(self, schema, config, obj) for obj in objects]
+            sheets = [("Data", headers, records)]
+            if config.details:
+                sheets.extend(await detail_sheets(self, config, headers, objects, records, obj_in.parent_fields, request))
+            content = await run_in_threadpool(write_excel_sheets, sheets)
             return Success(data={"filename": f"{self._resource}.xlsx", "content": b64encode(content).decode()})
 
         self._register_spec("export", f"/{self._resource}/export", {"POST"}, f"导出{self.summary_prefix}", export_excel)
