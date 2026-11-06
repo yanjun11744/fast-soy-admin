@@ -56,6 +56,7 @@ export default {
       },
       weighing_ticket: {
         pageTitle: 'Weighing Ticket',
+        images: 'Ticket images',
         ticketNo: 'ticketNo',
         weighingDate: 'weighingDate',
         weight: 'weight',

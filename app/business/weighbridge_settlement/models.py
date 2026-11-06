@@ -82,6 +82,11 @@ class WeighingTicket(BaseModel, AuditMixin):
         description="过磅日期",
     )
 
+    images = fields.JSONField(
+        null=True,
+        description="磅单图片 [images]",
+    )
+
     weight = fields.DecimalField(
         max_digits=16,
         decimal_places=3,

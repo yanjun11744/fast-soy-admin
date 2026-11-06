@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import ImagePreview from '@/components/advanced/image-preview.vue';
+import ImageUpload from '@/components/advanced/image-upload.vue';
 import {
   fetchAddWeighingTicket,
   fetchGetWeighingTicket,
@@ -22,6 +24,7 @@ const visible = defineModel<boolean>('visible', { default: false });
 const loading = ref(false);
 const failed = ref(false);
 const saving = ref(false);
+const uploading = ref(false);
 const rates = ref<Api.WeighbridgeSettlementManage.RateOption[]>([]);
 const model = ref(defaultModel());
 // NDatePicker requires null for an empty date; an empty string parses to NaN.
@@ -55,7 +58,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 let nextKey = 0;
 const rowKeys = ref<number[]>([]);
 function defaultModel(): Api.WeighbridgeSettlementManage.WeighingTicketAddParams {
-  return { ticketNo: '', weighingDate: '', weight: '', rateId: undefined, lines: [] };
+  return { ticketNo: '', weighingDate: '', weight: '', rateId: undefined, images: [], lines: [] };
 }
 function toInput(line: Api.WeighbridgeSettlementManage.LineInput): Api.WeighbridgeSettlementManage.LineInput {
   return {
@@ -106,7 +109,8 @@ function valid() {
         line.name.trim() &&
         /^\d+(\.\d{1,6})?$/.test(String(line.netWeight)) &&
         Number(line.netWeight) > 0 &&
-        (/^\d+(\.\d{1,6})?$/.test(line.grossWeight ?? '') && Number(line.grossWeight) > 0) &&
+        /^\d+(\.\d{1,6})?$/.test(line.grossWeight ?? '') &&
+        Number(line.grossWeight) > 0 &&
         Number.isInteger(line.quantity) &&
         line.quantity > 0
     )
@@ -124,7 +128,7 @@ async function runPreview(current: number) {
   preview.value = error ? null : data;
 }
 watch(
-  [model, price],
+  [() => model.value.weight, () => model.value.lines, price],
   () => {
     clearTimeout(timer);
     const current = ++previewSequence;
@@ -140,6 +144,7 @@ async function initialize() {
   const current = ++session;
   loading.value = true;
   failed.value = false;
+  uploading.value = false;
   model.value = defaultModel();
   preview.value = null;
   process.value = '';
@@ -160,6 +165,7 @@ async function initialize() {
       weighingDate: data.weighingDate,
       weight: String(data.weight),
       rateId: data.rateId,
+      images: [...(data.images ?? [])],
       lines: data.lines.map(toInput)
     };
     process.value = data.process;
@@ -172,6 +178,7 @@ async function initialize() {
   loading.value = false;
 }
 async function submit() {
+  if (uploading.value) return;
   if (
     saving.value ||
     readonly.value ||
@@ -254,6 +261,17 @@ const totalTheoretical = computed(() => {
               <NSelect :value="model.rateId" :options="rateOptions" filterable @update:value="selectRate" />
             </NFormItem>
           </div>
+          <NFormItem :label="$t('page.weighbridge_settlement.weighing_ticket.images')">
+            <ImagePreview v-if="readonly" :value="model.images" :width="96" :height="96" />
+            <ImageUpload
+              v-else-if="visible && !loading"
+              v-model:value="model.images"
+              v-model:busy="uploading"
+              value-type="array"
+              :limit="5"
+              :disabled="saving"
+            />
+          </NFormItem>
           <NSpace vertical class="mb-16px">
             <NText>
               {{ process }} · {{ $t('page.weighbridge_settlement.weighing_ticket.price') }}: {{ price || '—' }}
@@ -321,7 +339,13 @@ const totalTheoretical = computed(() => {
       <template #footer>
         <NSpace>
           <NButton :disabled="saving" @click="visible = false">{{ $t('common.cancel') }}</NButton>
-          <NButton v-if="!readonly" type="primary" :loading="saving" :disabled="loading || failed" @click="submit">
+          <NButton
+            v-if="!readonly"
+            type="primary"
+            :loading="saving"
+            :disabled="loading || failed || uploading"
+            @click="submit"
+          >
             {{ $t('common.confirm') }}
           </NButton>
         </NSpace>

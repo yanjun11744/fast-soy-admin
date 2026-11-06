@@ -57,6 +57,7 @@ export default {
       },
       weighing_ticket: {
         pageTitle: '磅单信息',
+        images: '磅单图片',
         ticketNo: '磅单编号',
         weighingDate: '过磅日期',
         weight: '实际过磅重量/kg',

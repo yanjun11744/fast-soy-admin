@@ -1,10 +1,14 @@
 """Settlement acceptance tests run exclusively against an isolated in-memory database."""
 
+from base64 import b64decode
+from collections.abc import AsyncIterator
 from decimal import Decimal
+from io import BytesIO
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from openpyxl import load_workbook
 from tortoise.context import tortoise_test_context
 
 from app.business.order_management.models import Order
@@ -290,3 +294,145 @@ async def test_missing_historical_gross_weight_can_be_filled_once(settlement_db,
     assert preserved['lines'][0]['grossWeight'] == '3.123456'
     settled = await services.settle_ticket(ticket_id, preserved['revision'])
     assert settled['isSettled'] is True
+
+
+@pytest.fixture
+async def ticket_export_client(settlement_db: SettlementRate) -> AsyncIterator[AsyncClient]:
+    app = FastAPI()
+    app.include_router(router)
+    register_exceptions(app)
+    app.dependency_overrides[PermissionControl.has_permission] = lambda: None
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+        yield client
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ticket_export_includes_snapshot_lines_and_ticket_numbers(settlement_db: SettlementRate, ticket_export_client: AsyncClient) -> None:
+    order = await Order.create(order_no="000123", part_no="000456", name="=1+1", net_weight="1.123456", gross_weight="2.654321", quantity=999)
+    data = payload(settlement_db)
+    data["lines"].insert(0, dict(orderId=encode_id(order.id), quantity=2))
+    first = await services.save_ticket(WeighingTicketCreate.model_validate(data))
+    data["ticketNo"] = "T-002"
+    data["lines"] = [dict(orderId=encode_id(order.id), quantity=3)]
+    second = await services.save_ticket(WeighingTicketCreate.model_validate(data))
+    await Order.filter(id=order.id).update(name="已修改", gross_weight="99")
+    response = await ticket_export_client.post("/weighing_tickets/export", json={"current": 2, "size": 1, "orderBy": ["-id"]})
+    assert response.json()["code"] == "0000"
+    exported = response.json()["data"]
+    assert exported["filename"] == "weighing_tickets.xlsx"
+    workbook = load_workbook(BytesIO(b64decode(exported["content"])))
+    try:
+        assert workbook.sheetnames == ["Data", "订单明细"]
+        headers = list(workbook["Data"].values)
+        assert [row[0] for row in headers[1:]] == ["T-002", "T-001"]
+        assert headers[1][-1] == encode_id(settlement_db.id)
+        rows = list(workbook["订单明细"].values)
+        assert rows[0] == ("磅单编号", "明细顺序", "订单号", "项目号", "名称", "净重", "毛重", "实际过磅数量", "机内合重/kg", "分摊过磅重量/kg", "含税结算金额/元", "含税单价（元/件）")
+        expected = [(second, line) for line in second["lines"]] + [(first, line) for line in first["lines"]]
+        assert len(rows) - 1 == len(expected)
+        for row, (ticket, line) in zip(rows[1:], expected, strict=True):
+            assert row == (
+                ticket["ticketNo"], line["position"], line["orderNo"], line["partNo"], line["name"],
+                line["netWeight"], line["grossWeight"], line["quantity"], line["theoreticalWeight"],
+                line["allocatedWeight"], line["amount"], line["taxUnitPrice"],
+            )
+        assert workbook["订单明细"]["E2"].value == "=1+1"
+        assert workbook["订单明细"]["E2"].data_type == "s"
+        assert rows[1][2:4] == ("000123", "000456")
+        assert rows[-1][2] is None  # Manual entries are exported with their ticket as well.
+    finally:
+        workbook.close()
+
+
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.parametrize("mode", ["selected", "filtered", "intersection", "empty", "empty_ids"])
+async def test_ticket_export_applies_same_selection_to_both_sheets(settlement_db: SettlementRate, ticket_export_client: AsyncClient, mode: str) -> None:
+    first = await services.save_ticket(WeighingTicketCreate.model_validate(payload(settlement_db)))
+    second = await services.save_ticket(WeighingTicketCreate.model_validate(payload(settlement_db, ticketNo="T-002", weighingDate="2026-11-05")))
+    queries = {
+        "selected": {"ids": [first["id"]]},
+        "filtered": {"weighingDateStart": "2026-11-02", "weighingDateEnd": "2026-11-06", "process": "喷", "isSettled": False, "rateId": encode_id(settlement_db.id)},
+        "intersection": {"ids": [first["id"], second["id"]], "ticketNo": "T-002"},
+        "empty": {"ids": [first["id"]], "ticketNo": "T-002"},
+        "empty_ids": {"ids": []},
+    }
+    response = await ticket_export_client.post("/weighing_tickets/export", json=queries[mode])
+    if mode == "empty_ids":
+        assert response.json()["code"] != "0000"
+        return
+    assert response.json()["code"] == "0000"
+    workbook = load_workbook(BytesIO(b64decode(response.json()["data"]["content"])))
+    try:
+        expected = [] if mode == "empty" else ["T-001" if mode == "selected" else "T-002"]
+        assert [row[0] for row in list(workbook["Data"].values)[1:]] == expected
+        assert [row[0] for row in list(workbook["订单明细"].values)[1:]] == [number for number in expected for _ in range(2)]
+    finally:
+        workbook.close()
+
+
+@pytest.mark.asyncio(loop_scope="session")
+@pytest.mark.parametrize("main_limit", [True, False])
+async def test_ticket_export_rejects_over_limit_without_partial_file(
+    settlement_db: SettlementRate, ticket_export_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, main_limit: bool,
+) -> None:
+    from app.business.weighbridge_settlement import export
+
+    await services.save_ticket(WeighingTicketCreate.model_validate(payload(settlement_db)))
+    if main_limit:
+        await services.save_ticket(WeighingTicketCreate.model_validate(payload(settlement_db, ticketNo="T-002")))
+    monkeypatch.setattr(export, "MAX_EXPORT_ROWS", 1)
+    response = await ticket_export_client.post("/weighing_tickets/export", json={})
+    result = response.json()
+    assert result["code"] != "0000"
+    assert "磅单" in result["msg"] if main_limit else "订单明细" in result["msg"]
+    assert not result.get("data")
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ticket_export_still_requires_backend_permission(settlement_db: SettlementRate) -> None:
+    app = FastAPI()
+    app.include_router(router)
+    register_exceptions(app)
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+        response = await client.post("/weighing_tickets/export", json={})
+    assert response.json()["code"] != "0000"
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_ticket_images_persist_preserve_clear_and_respect_settlement_lock(settlement_db: SettlementRate, ticket_export_client: AsyncClient) -> None:
+    images = [f"/system-manage/uploads/content/{number:032x}" for number in range(1, 3)]
+    response = await ticket_export_client.post("/weighing_tickets", json=payload(settlement_db, images=images))
+    saved = response.json()["data"]
+    assert saved["images"] == images
+    ticket_id = saved["id"]
+    assert (await ticket_export_client.get(f"/weighing_tickets/{ticket_id}")).json()["data"]["images"] == images
+    listed = (await ticket_export_client.post("/weighing_tickets/search", json={})).json()
+    assert listed["data"]["records"][0]["images"] == images
+    # Existing clients that omit the new optional field must not erase attachments.
+    unchanged = (await ticket_export_client.patch(f"/weighing_tickets/{ticket_id}", json=edit_payload(saved))).json()["data"]
+    assert unchanged["images"] == images
+    for value in (list(reversed(images)), [], None):
+        unchanged = (await ticket_export_client.patch(f"/weighing_tickets/{ticket_id}", json=edit_payload(unchanged, images=value))).json()["data"]
+        assert unchanged["images"] == value
+    saved = (await ticket_export_client.patch(f"/weighing_tickets/{ticket_id}", json=edit_payload(unchanged, images=images))).json()["data"]
+    await services.settle_ticket(decode_id(ticket_id), saved["revision"])
+    denied = await ticket_export_client.patch(f"/weighing_tickets/{ticket_id}", json=edit_payload(saved, images=[]))
+    assert denied.json()["code"] == "4603"
+    assert (await services.detail(decode_id(ticket_id)))["images"] == images
+    legacy = await services.save_ticket(WeighingTicketCreate.model_validate(payload(settlement_db, ticketNo="NO-PHOTO")))
+    assert legacy["images"] is None
+
+
+@pytest.mark.parametrize("images", [
+    [f"/system-manage/uploads/content/{number:032x}" for number in range(6)],
+    "not-an-array", [""], [123], ["javascript:alert(1)"], ["//example.com/image.jpg"],
+    ["/system-manage/uploads/content/../../secret"],
+])
+def test_ticket_images_validate_count_and_uploaded_paths(images: object) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        WeighingTicketCreate.model_validate({
+            "ticketNo": "T", "weighingDate": "2026-11-06", "weight": "1", "rateId": encode_id(1),
+            "lines": [{"partNo": "P", "name": "N", "netWeight": "1", "grossWeight": "1", "quantity": 1}], "images": images,
+        })

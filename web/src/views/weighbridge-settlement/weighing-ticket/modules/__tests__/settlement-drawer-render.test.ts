@@ -5,6 +5,7 @@ import { fetchSettlementRateOptions } from '@/service/api';
 import Drawer from '../weighing-ticket-operate-drawer.vue';
 
 vi.mock('@/locales', () => ({ $t: (key: string) => key }));
+vi.mock('@/service/api/upload', () => ({ fetchUploadImage: vi.fn(), fetchUploadOptions: vi.fn() }));
 vi.mock('@/service/api', () => ({
   fetchAddWeighingTicket: vi.fn(),
   fetchGetWeighingTicket: vi.fn(),
@@ -25,6 +26,7 @@ it('opens the add drawer with actual Naive UI controls and survives failed rate 
     attachTo: document.body,
     props: { operateType: 'add', visible: false },
     global: {
+      stubs: { ImageUpload: true, ImagePreview: true },
       plugins: [
         naive.create({
           components: [

@@ -12,6 +12,7 @@ import Drawer from '../weighing-ticket-operate-drawer.vue';
 import LineEditor from '../weighing-line-editor.vue';
 
 vi.mock('@/locales', () => ({ $t: (key: string) => key }));
+vi.mock('@/service/api/upload', () => ({ fetchUploadImage: vi.fn(), fetchUploadOptions: vi.fn() }));
 vi.mock('@/service/api', () => ({
   fetchAddWeighingTicket: vi.fn(),
   fetchGetWeighingTicket: vi.fn(),
@@ -56,6 +57,8 @@ const stubs = {
   NDescriptions: container,
   NDescriptionsItem: container,
   NInputNumber: input,
+  ImageUpload: true,
+  ImagePreview: true,
   WeighingLineTable: true
 };
 const line = {
@@ -84,6 +87,7 @@ const ticket = {
   totalAmount: '25.00',
   revision: 4,
   isSettled: false,
+  images: ['/system-manage/uploads/content/00000000000000000000000000000001'],
   lines: [line]
 };
 
@@ -105,6 +109,41 @@ afterEach(() => {
 });
 
 describe('Ticket aggregate editor', () => {
+  it('loads and saves ticket images and blocks submission while uploading', async () => {
+    prepare();
+    const wrapper = mount(Drawer, {
+      props: {
+        operateType: 'edit',
+        rowData: ticket as unknown as Api.WeighbridgeSettlementManage.WeighingTicket,
+        visible: false
+      },
+      global: { stubs }
+    });
+    await wrapper.setProps({ visible: true });
+    await flushPromises();
+    const upload = wrapper.findComponent({ name: 'ImageUpload' });
+    expect(upload.props('value')).toEqual(ticket.images);
+    expect(upload.props('valueType')).toBe('array');
+    expect(upload.props('limit')).toBe(5);
+    upload.vm.$emit('update:busy', true);
+    await flushPromises();
+    const confirm = wrapper.findAllComponents(button).find(node => node.text() === 'common.confirm')!;
+    expect(confirm.props('disabled')).toBe(true);
+    confirm.vm.$emit('click');
+    await flushPromises();
+    expect(fetchUpdateWeighingTicket).not.toHaveBeenCalled();
+    const images = ['/system-manage/uploads/content/00000000000000000000000000000002'];
+    upload.vm.$emit('update:value', images);
+    upload.vm.$emit('update:busy', false);
+    await flushPromises();
+    expect(confirm.props('disabled')).toBe(false);
+    await confirm.trigger('click');
+    await flushPromises();
+    expect(fetchUpdateWeighingTicket).toHaveBeenCalledWith(expect.objectContaining({ images }));
+    expect(wrapper.findComponent({ name: 'ImageUpload' }).exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('loads stored lines and preserves the price until explicitly reselected', async () => {
     prepare();
     const wrapper = mount(Drawer, {
@@ -171,6 +210,8 @@ describe('Ticket aggregate editor', () => {
     await flushPromises();
     expect(readonly.findAll('button').some(node => node.text() === 'common.confirm')).toBe(false);
     expect(readonly.findComponent(LineEditor).exists()).toBe(false);
+    expect(readonly.findComponent({ name: 'ImageUpload' }).exists()).toBe(false);
+    expect(readonly.findComponent({ name: 'ImagePreview' }).props('value')).toEqual(ticket.images);
     readonly.unmount();
   });
 

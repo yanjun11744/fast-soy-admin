@@ -4,6 +4,7 @@
 
 ## 数据与计算
 
+- 磅单新增可选 `images` 字段，保存最多 5 张系统上传图片的相对 URL，旧记录为 `NULL`。新增、编辑支持上传和移除引用，列表显示缩略图，详情支持放大预览；上传中禁止提交，已结算磅单继续只读。旧客户端更新时省略 `images` 会保留原图片，显式传 `[]` 或 `null` 可清空。上传沿用 `B_SYSTEM_UPLOAD_CREATE` 权限，普通角色需由管理员授予现有上传权限；不修改权限种子。图片沿用系统公开图片存储机制。
 - 关联订单通过注册的 `app_system.Order` 查询；不修改或自动创建正式订单。
 - 手动明细 `order_id=NULL`，项目号、名称、单重、实际数量必填。
 - 保存明细顺序为请求数组顺序，后端生成从 1 开始的 `position`。保留已有明细 ID，差异删除、新增、更新均在一个事务中。
@@ -12,6 +13,7 @@
 - 详情锁定主表后读取数据库明细，避免并发保存期间读到不同版本的主从表。
 - 结算会校验明细及合计，并递增 revision；已结算主从表禁止更新和删除。
 - 磅单单表 Excel 导入已关闭，防止绕过明细和快照校验；工序价格 Excel 功能及磅单只读导出保留。
+- 磅单筛选/勾选导出在原 `Data` 主表之外增加“订单明细”工作表，每行包含磅单编号、明细顺序、订单号、项目号、名称、净重、毛重、实际过磅数量及结算数据。关联订单和手动明细均导出保存时的快照，不读取当前订单资料；筛选条件与勾选 ID 取交集，导出不受当前分页限制。主表、明细各最多 10000 行，超限会提示缩小筛选范围，不截断明细。
 - 结算接口中的 Decimal 以字符串返回，保持精度；前端预览调用后端试算接口，最终保存仍重新计算。
 
 ## 接口
@@ -24,7 +26,7 @@
 | POST | `/weighing_tickets/order-options` | 项目号搜索，精确匹配优先，最多 50 条 |
 | POST | `/weighing_tickets/preview` | Decimal 试算 |
 | POST | `/weighing_tickets/search` | 原生成列表查询 |
-| POST | `/weighing_tickets/export` | 保留只读导出（筛选或所选记录） |
+| POST | `/weighing_tickets/export` | 导出磅单及对应订单明细（筛选或所选记录） |
 | GET | `/weighing_tickets/{id}` | 磅单及按 position 排序的全部明细 |
 | POST | `/weighing_tickets` | 事务创建主从表 |
 | PATCH | `/weighing_tickets/{id}` | 完整聚合更新，revision 必填 |
@@ -35,6 +37,10 @@
 对外所有资源 ID 均使用 Sqids。禁止客户端提交 price、process、totalAmount、isSettled 等服务端计算或控制的字段。
 
 ## 迁移
+
+图片字段迁移由 `just makemigrations` 自动生成于 `migrations/app_system/0007_auto_20261106_1815.py`，仅执行 `ALTER TABLE "biz_settlement_ticket" ADD COLUMN "images" JSONB;`，字段可空、保留已有磅单。需按根 AGENTS.md 在 SQL 审阅确认后执行 `just migrate`，再使用新版本接口。
+
+本次已按用户确认对当前配置的开发数据库应用 0007 迁移；其他环境仍需单独应用。
 
 自动生成 `migrations/app_system/0004_auto_20261101_1059.py`，仅执行：
 

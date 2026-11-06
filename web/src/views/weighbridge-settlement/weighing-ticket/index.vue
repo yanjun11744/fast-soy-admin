@@ -1,6 +1,7 @@
 <script setup lang="tsx">
 import { onMounted, reactive, ref } from 'vue';
 import { NButton, NPopconfirm } from 'naive-ui';
+import ImagePreview from '@/components/advanced/image-preview.vue';
 import {
   fetchBatchDeleteWeighingTicket, fetchDeleteWeighingTicket, fetchGetWeighingTicketList,
   fetchExportWeighingTicket, fetchSettlementRateOptions, fetchSettleWeighingTicket
@@ -49,6 +50,7 @@ const { columns, columnChecks, data, loading, getData, getDataByPage, mobilePagi
     { type: 'selection', align: 'center', width: 48 },
     { key: 'index', title: $t('common.index'), width: 64, align: 'center', render: (_, index) => index + 1 },
     { key: 'ticketNo', title: $t('page.weighbridge_settlement.weighing_ticket.ticketNo'), align: 'center', minWidth: 120 },
+    { key: 'images', title: $t('page.weighbridge_settlement.weighing_ticket.images'), align: 'center', minWidth: 160, render: row => <ImagePreview value={row.images} width={48} height={48} /> },
     { key: 'weighingDate', title: $t('page.weighbridge_settlement.weighing_ticket.weighingDate'), align: 'center', minWidth: 120 },
     { key: 'weight', title: $t('page.weighbridge_settlement.weighing_ticket.weight'), align: 'center', minWidth: 120 },
     { key: 'process', title: $t('page.weighbridge_settlement.weighing_ticket.process'), align: 'center', minWidth: 120 },

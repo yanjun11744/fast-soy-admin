@@ -11,6 +11,8 @@ from pydantic import ConfigDict, Field, field_validator
 
 from app.utils import Int32, PageQueryBase, SchemaBase, SchemaValidationError, SqidId, make_optional
 
+TicketImage = Annotated[str, Field(pattern=r"^/system-manage/uploads/content/[0-9a-f]{32}$")]
+
 # ============================================================
 # 工序招采价格
 # ============================================================
@@ -85,6 +87,7 @@ class WeighingTicketCreate(SchemaBase):
     weighing_date: date
     weight: Decimal = Field(gt=0, max_digits=16, decimal_places=3)
     rate_id: SqidId
+    images: list[TicketImage] | None = Field(None, max_length=5, title="磅单图片")
     lines: list[WeighingLineInput] = Field(min_length=1, max_length=500)
 
 
@@ -115,6 +118,13 @@ class WeighingTicketSearch(WeighingTicketBase, PageQueryBase):
     weighing_date_end: date | None = Field(None, title="过磅日期结束")
 
 
+MAX_EXPORT_ROWS = 10000
+
+
+class WeighingTicketExport(WeighingTicketSearch):
+    ids: list[SqidId] | None = Field(None, min_length=1, max_length=MAX_EXPORT_ROWS, title="所选记录 ID")
+
+
 class WeighingLineOut(SchemaBase):
     id: SqidId
     order_id: SqidId | None
@@ -135,6 +145,7 @@ class WeighingTicketOut(SchemaBase):
     id: SqidId
     ticket_no: str = Field(title="磅单编号")
     weighing_date: date = Field(title="过磅日期")
+    images: list[str] | None = Field(None, title="磅单图片")
     weight: Decimal = Field(title="实际过磅重量/kg")
     rate_id: SqidId = Field(title="工序招采价格")
     process: str = Field(title="工序名称快照")

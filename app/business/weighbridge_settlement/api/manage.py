@@ -1,9 +1,13 @@
 """Generated rate CRUD and ticket aggregate endpoints, under the existing permission manifest."""
 
+from base64 import b64encode
+
 from fastapi import APIRouter
+from tortoise.expressions import Q
 
 from app.business.weighbridge_settlement import services
 from app.business.weighbridge_settlement.controllers import settlement_rate_controller, weighing_ticket_controller
+from app.business.weighbridge_settlement.export import TICKET_EXCEL, export_tickets
 from app.business.weighbridge_settlement.schemas import (
     OrderLookup,
     PreviewInput,
@@ -12,6 +16,7 @@ from app.business.weighbridge_settlement.schemas import (
     SettlementRateSearch,
     SettlementRateUpdate,
     WeighingTicketCreate,
+    WeighingTicketExport,
     WeighingTicketOut,
     WeighingTicketSearch,
     WeighingTicketUpdate,
@@ -36,7 +41,7 @@ weighing_ticket_crud = CRUDRouter(
     prefix="/weighing_tickets",
     controller=weighing_ticket_controller,
     create_schema=WeighingTicketOut,
-    excel=ExcelConfig(fields=("ticket_no", "weighing_date", "weight", "process", "price", "total_amount", "is_settled", "revision", "rate_id")),
+    excel=TICKET_EXCEL,
     update_schema=WeighingTicketUpdate,
     list_schema=WeighingTicketSearch,
     enable_routes={"list"},
@@ -46,6 +51,15 @@ weighing_ticket_crud = CRUDRouter(
 )
 
 router = APIRouter(tags=["weighbridge_settlement"], dependencies=[DependPermission])
+
+
+@weighing_ticket_crud.override("export")
+async def export_ticket_excel(obj_in: WeighingTicketExport) -> Success:
+    search = weighing_ticket_controller.build_search(obj_in, **vars(weighing_ticket_crud.search_fields))
+    if obj_in.ids is not None:
+        search &= Q(id__in=obj_in.ids)
+    content = await export_tickets(search, obj_in.order_by or weighing_ticket_crud.list_order)
+    return Success(data={"filename": "weighing_tickets.xlsx", "content": b64encode(content).decode()})
 
 
 @router.get("/settlement_rates/options", summary="可选启用工序", name="weighbridge_settlement.settlement_rates.options")

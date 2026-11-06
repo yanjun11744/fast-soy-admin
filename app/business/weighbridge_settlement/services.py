@@ -97,7 +97,10 @@ async def save_ticket(payload: WeighingTicketCreate | WeighingTicketUpdate, tick
             rows.append(row)
         amount, rows = calculate(payload.weight, price, rows)
         actor = str(get_current_user_id() or "")
-        values = dict(ticket_no=payload.ticket_no, weighing_date=payload.weighing_date, weight=payload.weight, price=price, process=process, total_amount=amount, updated_by=actor)
+        values: dict[str, Any] = dict(ticket_no=payload.ticket_no, weighing_date=payload.weighing_date, weight=payload.weight, price=price, process=process, total_amount=amount, updated_by=actor)
+        # Older clients omit images; preserve existing attachments unless explicitly submitted.
+        if ticket is None or "images" in payload.model_fields_set:
+            values["images"] = payload.images
         if rate:
             values["rate_id"] = rate.id
         if ticket:

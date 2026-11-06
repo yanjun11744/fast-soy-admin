@@ -31,6 +31,7 @@ declare namespace Api {
     // ---- WeighingTicket ----
     type WeighingTicket = Common.CommonRecord<{
       ticketNo: string;
+      images: string[] | null;
       weighingDate: string;
       weight: number;
       process: string;
@@ -77,6 +78,7 @@ declare namespace Api {
     type Preview = { totalAmount: string; lines: WeighingLine[] };
     type WeighingTicketAddParams = {
       ticketNo: string;
+      images?: string[] | null;
       weighingDate: string;
       weight: string;
       rateId?: string;

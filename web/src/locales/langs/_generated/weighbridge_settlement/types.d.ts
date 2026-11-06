@@ -55,6 +55,7 @@ declare global {
         };
         weighing_ticket: {
           pageTitle: string;
+          images: string;
           ticketNo: string;
           weighingDate: string;
           weight: string;
