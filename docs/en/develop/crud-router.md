@@ -233,6 +233,20 @@ The module's `api/__init__.py` must export `router: APIRouter` for autodiscover 
 
 ## Excel titles, exact aliases and import preview
 
+### Parent and child exports
+
+When both models are selected for generation (for example `--models Order,OrderLine`), the generator detects same-module foreign keys and one-to-one child relationships and adds `ExcelConfig.details`. Multiple direct children are supported; self-relations, cross-module references, many-to-many relations and plain integer IDs are not inferred. Children must have a list route and exportable fields.
+
+Generated parent exports first ask which parent fields to repeat on each child row. The workbook keeps the full `Data` parent sheet and adds a sheet per direct child, grouped in parent export order and using the child's configured order within each group. Parent columns have the `父表：` prefix to distinguish duplicate child titles. Empty results keep their headers.
+
+`POST /resources/export` accepts `parentFields?: string[] | null` using internal field names from the parent Excel allowlist. Omitted or `null` includes all parent export fields; `[]` includes none. Unknown, excluded and duplicate names are rejected. This changes only child sheets, not the main sheet or import template. Each sheet is limited to 10000 rows and 200 combined parent/child columns; oversized exports fail rather than truncate.
+
+Existing modules can opt in with `ExcelConfig(fields=("order_no",), details=(ExcelDetail(sheet_name="Lines", resource=lambda: order_line_crud, parent_field="order_id"),))`. Import `ExcelDetail` from `app.utils`. The lazy child `CRUDRouter` reference permits either declaration order. On `ExcelTransfer`, supply `export-parent-fields` as `{ name, label }[]`, `export-api="parentFields => fetchExportOrder({ ...searchParams, parentFields })"`, and `export-selected-api="(ids, parentFields) => fetchExportOrder({ ...searchParams, ids, parentFields })"`.
+
+Child rows are limited to the exported parent IDs and reuse the child's Excel allowlist, excluded fields, data policy, export scope filter, configured default manager (including soft deletion) and record transform. Parent export permission grants access to the explicitly declared child exports; grant it accordingly. Custom list constraints must also be applied through `excel_scope_filter`; custom export overrides are not invoked. Combined generation shares the backend exclusions; standalone `gen-web` accepts `--exclude-fields Order:secret` to match the backend.
+
+This adds read-only child export, not aggregate import. To import the parent sheet back, select `Data` in the import preview. Existing generated modules are not overwritten automatically; preserve custom business logic when adopting this feature.
+
 `POST /customers/export` accepts the list search fields plus optional `ids: SqidId[]`. Omitted or `null` IDs export all matching records. An array exports the intersection of selected IDs, search filters, `data_policy` and `excel_scope_filter`, preserving list order and ignoring pagination. Empty arrays, invalid IDs and arrays exceeding 10000 IDs are rejected; duplicate IDs do not duplicate rows. Deleted or inaccessible records are excluded.
 
 Generated pages provide an export dropdown with “Export filtered results” and “Export selected (N)”; selection export is disabled when nothing is checked. Existing pages can pass `:selected-ids="checkedRowKeys"` and `:export-selected-api="ids => fetchExportCustomer({ ...searchParams, ids })"` to `ExcelTransfer`, and extend the service parameter type to `SearchParams & { ids?: string[] }`. Without `export-selected-api`, the original single export button remains. Selection follows the table's existing behavior; no cross-page select-all is added.

@@ -69,6 +69,7 @@ from app.core.events import emit as emit
 from app.core.events import on as on
 from app.core.excel import ExcelColumn as ExcelColumn
 from app.core.excel import ExcelConfig as ExcelConfig
+from app.core.excel import ExcelDetail as ExcelDetail
 from app.core.exceptions import BizError as BizError
 from app.core.exceptions import SchemaValidationError as SchemaValidationError
 

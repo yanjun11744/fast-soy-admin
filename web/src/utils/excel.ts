@@ -20,7 +20,12 @@ export interface ExcelPreview {
 }
 
 type ExcelResult<T> = Promise<{ data: T | null; error: unknown }>;
-export type ExcelImportApi = (file: File, options?: ExcelImportOptions) => ExcelResult<{ importedCount: number }>;
+export interface ExcelImportResult {
+  importedCount: number;
+  createdCount?: number;
+  updatedCount?: number;
+}
+export type ExcelImportApi = (file: File, options?: ExcelImportOptions) => ExcelResult<ExcelImportResult>;
 export type ExcelPreviewApi = (file: File, options?: ExcelImportOptions) => ExcelResult<ExcelPreview>;
 
 export function createExcelFormData(file: File, options?: ExcelImportOptions) {

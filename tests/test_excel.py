@@ -1,4 +1,5 @@
 """Excel boundary and HTTP tests use only the suite's in-memory database."""
+
 from base64 import b64decode
 from datetime import date
 from decimal import Decimal
@@ -48,12 +49,15 @@ def test_excel_accepts_titles_and_aliases(headers):
     assert read_excel(content, Row, tuple(Row.model_fields))[0].item_name == "example"
 
 
-@pytest.mark.parametrize("headers,rows", [
-    (["item_name", "itemName", "due_date"], [["private", 1, "2026-10-30"]]),
-    (["item_name"], [["private"]]),
-    (["item_name", "amount", "due_date"], [["private", "invalid", "2026-10-30"]]),
-    (["item_name", "amount", "due_date"], []),
-])
+@pytest.mark.parametrize(
+    "headers,rows",
+    [
+        (["item_name", "itemName", "due_date"], [["private", 1, "2026-10-30"]]),
+        (["item_name"], [["private"]]),
+        (["item_name", "amount", "due_date"], [["private", "invalid", "2026-10-30"]]),
+        (["item_name", "amount", "due_date"], []),
+    ],
+)
 def test_excel_rejects_bad_headers_and_rows_without_leaking_values(headers, rows):
     with pytest.raises(BizError) as error:
         read_excel(write_excel(headers, rows), Row, tuple(Row.model_fields))
@@ -87,10 +91,15 @@ class DictionarySearch(PageQueryBase):
 
 def excel_app(scope=None, dependencies=None, config=None):
     crud = CRUDRouter(
-        prefix="/items", controller=CRUDBase(Dictionary), create_schema=DictionaryRow,
-        list_schema=DictionarySearch, excel=config or ExcelConfig(tuple(DictionaryRow.model_fields)),
+        prefix="/items",
+        controller=CRUDBase(Dictionary),
+        create_schema=DictionaryRow,
+        update_schema=DictionaryRow,
+        list_schema=DictionarySearch,
+        excel=config or ExcelConfig(tuple(DictionaryRow.model_fields)),
         search_fields=SearchFieldConfig(contains_fields=["label"]),
-        excel_scope_filter=scope, action_dependencies=dependencies,
+        excel_scope_filter=scope,
+        action_dependencies=dependencies,
     )
     api = FastAPI()
     api.add_exception_handler(BizError, BizErrorHandle)
@@ -108,7 +117,7 @@ async def test_excel_http_import_export_and_rollback(app, monkeypatch):
         headers = list(DictionaryRow.model_fields)
         content = write_excel(headers, [["excel-test", "visible", "one"], ["excel-other", "visible", "two"]])
         response = await client.post("/items/import", files={"file": ("items.xlsx", content)})
-        assert response.json()["data"]["importedCount"] == 2
+        assert response.json()["data"] == {"importedCount": 2, "createdCount": 2, "updatedCount": 0}
         response = await client.post("/items/export", json={"label": "visible", "size": 1, "current": 2})
         data = response.json()["data"]
         exported = read_excel(b64decode(data["content"]), DictionaryRow, tuple(headers))
@@ -161,7 +170,7 @@ def test_generator_includes_excel_and_scope_by_default():
     options = BackendFeatureOptions(button_auth_models={"Customer"}, data_scope={"Customer": DataScopeOption("owner_id", "owner_id")})
     backend = gen_api_manage("crm", [model], {"Customer": ["name"]}, backend_options=options)
     compile(backend, "manage.py", "exec")
-    assert "excel=ExcelConfig(fields=('name', 'owner_id'))" in backend
+    assert "excel=ExcelConfig(fields=('name', 'owner_id'), update_key='id')" in backend
     assert "excel_scope_filter=_customer_excel_scope" in backend
     assert '"import": [require_buttons("B_CRM_CUSTOMER_IMPORT")]' in backend
     assert '"export": [require_buttons("B_CRM_CUSTOMER_EXPORT")]' in backend
@@ -178,8 +187,33 @@ def test_generator_includes_excel_and_scope_by_default():
     assert "multipart/form-data" in service
     assert "createExcelFormData(file, options)" in service
     assert "fetchPreviewImportCustomer" in service and "/import-preview" in service
+    assert "request<ExcelImportResult>" in service
     assert "CustomerSearchParams & { ids?: string[] }" in service
     assert ':preview-api="fetchPreviewImportCustomer"' in frontend
+
+
+@pytest.mark.parametrize(
+    "fields,excluded,expected",
+    [
+        ([FieldInfo("code", "CharField", "str", unique=True)], [], "update_key='code'"),
+        ([FieldInfo("code", "CharField", "str", unique=True), FieldInfo("email", "CharField", "str", unique=True)], [], "update_key='id'"),
+        ([FieldInfo("code", "CharField", "str", unique=True, required=False)], [], "update_key='id'"),
+        ([FieldInfo("code", "CharField", "str", unique=True), FieldInfo("name", "CharField", "str")], ["code"], "update_key='id'"),
+    ],
+)
+def test_generator_selects_only_unambiguous_required_unique_keys(fields: list[FieldInfo], excluded: list[str], expected: str) -> None:
+    model = ModelInfo(name="Customer", cn_name="客户", fields=fields)
+    options = BackendFeatureOptions(exclude_fields={"Customer": excluded})
+    backend = gen_api_manage("crm", [model], {}, backend_options=options)
+    compile(backend, "manage.py", "exec")
+    assert expected in backend
+
+
+def test_generator_keeps_create_only_excel_when_update_is_disabled_or_id_is_excluded() -> None:
+    model = ModelInfo(name="Customer", cn_name="客户", fields=[FieldInfo("name", "CharField", "str")])
+    for options in [BackendFeatureOptions(enable_routes={"Customer": {"create", "list"}}), BackendFeatureOptions(exclude_fields={"Customer": ["id"]})]:
+        backend = gen_api_manage("crm", [model], {}, backend_options=options)
+        assert "update_key=" not in backend
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -200,10 +234,14 @@ async def test_selected_export_intersects_ids_search_and_permissions(app, monkey
     ]
     # Exercise both independent permission filters in the actual export endpoint.
     crud = CRUDRouter(
-        prefix="/items", controller=CRUDBase(Dictionary), create_schema=DictionaryRow,
-        list_schema=DictionarySearch, excel=ExcelConfig(tuple(DictionaryRow.model_fields)),
+        prefix="/items",
+        controller=CRUDBase(Dictionary),
+        create_schema=DictionaryRow,
+        list_schema=DictionarySearch,
+        excel=ExcelConfig(tuple(DictionaryRow.model_fields)),
         search_fields=SearchFieldConfig(contains_fields=["label"]),
-        excel_scope_filter=scope, data_policy="test-policy",
+        excel_scope_filter=scope,
+        data_policy="test-policy",
     )
     api = FastAPI()
     api.include_router(crud.router)
@@ -237,8 +275,7 @@ def test_excel_is_opt_in_and_respects_route_and_field_boundaries():
     controller = CRUDBase(Dictionary)
     normal = CRUDRouter("/items", controller, create_schema=DictionaryRow, list_schema=DictionarySearch)
     assert not any("import" in route.path or "export" in route.path for route in normal.router.routes)
-    restricted = CRUDRouter("/items", controller, create_schema=DictionaryRow, list_schema=DictionarySearch,
-                            enable_routes={"get"}, excel=ExcelConfig(tuple(DictionaryRow.model_fields)))
+    restricted = CRUDRouter("/items", controller, create_schema=DictionaryRow, list_schema=DictionarySearch, enable_routes={"get"}, excel=ExcelConfig(tuple(DictionaryRow.model_fields)))
     assert len(restricted.router.routes) == 1
     with pytest.raises(ValueError, match="excluded"):
         CRUDRouter("/items", controller, create_schema=DictionaryRow, excel=ExcelConfig(("value",)), exclude_fields=["value"])
@@ -280,14 +317,17 @@ def test_excel_never_normalizes_or_guesses_aliases(label):
         read_excel(content, Row, row_config())
 
 
-@pytest.mark.parametrize("columns", [
-    {"item_name": ExcelColumn(aliases=("amount",))},
-    {"item_name": ExcelColumn(aliases=("金额",)), "amount": ExcelColumn(title="金额")},
-    {"item_name": ExcelColumn(title="相同"), "amount": ExcelColumn(title="相同")},
-    {"unknown": ExcelColumn(title="未知")},
-    {"item_name": ExcelColumn(aliases=("",))},
-    {"item_name": ExcelColumn(aliases="商品名称")},
-])
+@pytest.mark.parametrize(
+    "columns",
+    [
+        {"item_name": ExcelColumn(aliases=("amount",))},
+        {"item_name": ExcelColumn(aliases=("金额",)), "amount": ExcelColumn(title="金额")},
+        {"item_name": ExcelColumn(title="相同"), "amount": ExcelColumn(title="相同")},
+        {"unknown": ExcelColumn(title="未知")},
+        {"item_name": ExcelColumn(aliases=("",))},
+        {"item_name": ExcelColumn(aliases="商品名称")},
+    ],
+)
 def test_excel_rejects_ambiguous_or_invalid_column_configuration(columns):
     with pytest.raises(ValueError):
         ExcelConfig(("item_name", "amount", "due_date"), columns).resolve(Row)
@@ -364,11 +404,14 @@ def test_excel_does_not_silently_truncate_distant_columns():
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_excel_http_preview_is_readonly_and_commit_rechecks_options(app):
-    config = ExcelConfig(tuple(DictionaryRow.model_fields), {
-        "dict_type": ExcelColumn(title="字典类型", aliases=("Type",)),
-        "label": ExcelColumn(title="标签"),
-        "value": ExcelColumn(title="值"),
-    })
+    config = ExcelConfig(
+        tuple(DictionaryRow.model_fields),
+        {
+            "dict_type": ExcelColumn(title="字典类型", aliases=("Type",)),
+            "label": ExcelColumn(title="标签"),
+            "value": ExcelColumn(title="值"),
+        },
+    )
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=excel_app(config=config)), base_url="http://test") as client:
         template = (await client.get("/items/import-template")).json()["data"]
         workbook = load_workbook(BytesIO(b64decode(template["content"])))
@@ -383,7 +426,7 @@ async def test_excel_http_preview_is_readonly_and_commit_rechecks_options(app):
         checked = (await client.post("/items/import-preview", files=files, data={"options": options})).json()["data"]
         assert not checked["errors"]
         assert not await Dictionary.filter(dict_type="preview-test").exists()
-        for invalid in ('{"columns":["dict_type","label","value","id"]}', '{"headerRow":0}', 'not-json'):
+        for invalid in ('{"columns":["dict_type","label","value","id"]}', '{"headerRow":0}', "not-json"):
             response = await client.post("/items/import", files=files, data={"options": invalid})
             assert response.json()["code"] != "0000"
         imported = (await client.post("/items/import", files=files)).json()

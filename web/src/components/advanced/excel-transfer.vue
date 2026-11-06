@@ -11,8 +11,9 @@ type Result<T> = Promise<{ data: T | null; error: unknown }>;
 interface Props {
   importApi: ExcelImportApi;
   previewApi?: ExcelPreviewApi;
-  exportApi: () => Result<ExcelDownload>;
-  exportSelectedApi?: (ids: string[]) => Result<ExcelDownload>;
+  exportApi: (parentFields?: string[]) => Result<ExcelDownload>;
+  exportSelectedApi?: (ids: string[], parentFields?: string[]) => Result<ExcelDownload>;
+  exportParentFields?: { name: string; label: string }[];
   selectedIds?: string[];
   templateApi: () => Result<ExcelDownload>;
   canImport?: boolean;
@@ -24,11 +25,15 @@ const props = withDefaults(defineProps<Props>(), {
   canExport: true,
   previewApi: undefined,
   exportSelectedApi: undefined,
+  exportParentFields: () => [],
   selectedIds: () => []
 });
 const emit = defineEmits<{ imported: [] }>();
 const busy = ref(false);
 const selectedFile = shallowRef<File | null>(null);
+const exportDialog = ref(false);
+const selectedParentFields = ref<string[]>([]);
+const pendingIds = ref<string[] | undefined>();
 const exportOptions = computed(() => [
   { label: $t('common.excelExportFiltered'), key: 'filtered' },
   {
@@ -39,18 +44,44 @@ const exportOptions = computed(() => [
 ]);
 
 async function download(template = false, selected = false) {
-  if (busy.value || selectedFile.value) return;
+  if (busy.value || selectedFile.value || exportDialog.value) return;
+  if (template ? !props.canImport : !props.canExport) return;
   if (selected && (!props.exportSelectedApi || props.selectedIds.length === 0)) return;
+  const ids = selected ? [...props.selectedIds] : undefined;
+  if (!template && props.exportParentFields.length) {
+    pendingIds.value = ids;
+    selectedParentFields.value = props.exportParentFields.map(field => field.name);
+    exportDialog.value = true;
+    return;
+  }
+  await performDownload(template, ids);
+}
+
+async function confirmExport() {
+  if (busy.value || !props.canExport) return;
+  await performDownload(false, pendingIds.value, [...selectedParentFields.value]);
+}
+
+async function performDownload(template: boolean, ids?: string[], parentFields?: string[]) {
+  if (busy.value) return;
+  if (ids && (!ids.length || !props.exportSelectedApi)) return;
   busy.value = true;
   try {
     const result =
-      selected && props.exportSelectedApi
-        ? props.exportSelectedApi([...props.selectedIds])
+      ids && props.exportSelectedApi
+        ? parentFields === undefined
+          ? props.exportSelectedApi(ids)
+          : props.exportSelectedApi(ids, parentFields)
         : template
           ? props.templateApi()
-          : props.exportApi();
+          : parentFields === undefined
+            ? props.exportApi()
+            : props.exportApi(parentFields);
     const { data, error } = await result;
-    if (!error && data) downloadExcel(data);
+    if (!error && data) {
+      downloadExcel(data);
+      exportDialog.value = false;
+    }
   } finally {
     busy.value = false;
   }
@@ -58,7 +89,7 @@ async function download(template = false, selected = false) {
 
 async function upload(options: UploadCustomRequestOptions) {
   const file = options.file.file;
-  if (!file || busy.value || selectedFile.value) {
+  if (!file || busy.value || selectedFile.value || exportDialog.value) {
     options.onError();
     return;
   }
@@ -79,7 +110,12 @@ async function upload(options: UploadCustomRequestOptions) {
       options.onError();
       return;
     }
-    window.$message?.success($t('common.excelImportSuccess', { count: data.importedCount }));
+    window.$message?.success(
+      $t('common.excelImportSuccess', {
+        created: data.createdCount ?? data.importedCount - (data.updatedCount ?? 0),
+        updated: data.updatedCount ?? 0
+      })
+    );
     options.onFinish();
     emit('imported');
   } catch {
@@ -134,5 +170,32 @@ async function upload(options: UploadCustomRequestOptions) {
       @close="selectedFile = null"
       @imported="emit('imported')"
     />
+    <NModal
+      v-if="exportDialog"
+      v-model:show="exportDialog"
+      preset="card"
+      :title="$t('common.excelDetailExport')"
+      class="w-140 max-w-95vw"
+      :mask-closable="!busy"
+      :close-on-esc="!busy"
+      :closable="!busy"
+    >
+      <p class="mb-4">{{ $t('common.excelParentFieldsHint') }}</p>
+      <NFormItem :label="$t('common.excelParentFields')">
+        <NCheckboxGroup v-model:value="selectedParentFields" :disabled="busy">
+          <NSpace wrap>
+            <NCheckbox v-for="field in exportParentFields" :key="field.name" :value="field.name" :label="field.label" />
+          </NSpace>
+        </NCheckboxGroup>
+      </NFormItem>
+      <template #footer>
+        <NSpace justify="end">
+          <NButton :disabled="busy" @click="exportDialog = false">{{ $t('common.cancel') }}</NButton>
+          <NButton type="primary" :loading="busy" :disabled="!canExport" @click="confirmExport">
+            {{ $t('common.excelExport') }}
+          </NButton>
+        </NSpace>
+      </template>
+    </NModal>
   </NSpace>
 </template>

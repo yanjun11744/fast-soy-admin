@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from app.cli.options import BackendFeatureOptions
 from app.cli.parser import DATE_RANGE_FIELD_TYPES, FieldInfo, ModelInfo, RelationInfo
+from app.cli.relations import excel_field_names, export_children
 
 # ─── 命名转换 ───
 
@@ -150,7 +152,7 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
     lines = [
         "import { request } from '../request';",
         "import { createExcelFormData } from '@/utils/excel';",
-        "import type { ExcelDownload, ExcelImportOptions, ExcelPreview } from '@/utils/excel';",
+        "import type { ExcelDownload, ExcelImportOptions, ExcelImportResult, ExcelPreview } from '@/utils/excel';",
         "",
     ]
     for model in models:
@@ -208,7 +210,8 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
             "}",
             "",
             "",
-            f"export function fetchExport{entity}(data?: Api.{ns}.{entity}SearchParams & {{ ids?: string[] }}) {{",
+            f"export function fetchExport{entity}(data?: Api.{ns}.{entity}SearchParams & "
+            f"{{ ids?: string[]{'; parentFields?: string[]' if export_children(module, model, models, BackendFeatureOptions()) else ''} }}) {{",
             f"  return request<ExcelDownload>({{ url: '{url_base}/export', method: 'post', data: data ?? {{}} }});",
             "}",
             "",
@@ -223,7 +226,7 @@ def gen_service_ts(module: str, models: list[ModelInfo]) -> str:
             "",
             f"export function fetchImport{entity}(file: File, options?: ExcelImportOptions) {{",
             "  const data = createExcelFormData(file, options);",
-            f"  return request<{{ importedCount: number }}>({{ url: '{url_base}/import', method: 'post', data, headers: {{ 'Content-Type': 'multipart/form-data' }}, timeout: 120000 }});",
+            f"  return request<ExcelImportResult>({{ url: '{url_base}/import', method: 'post', data, headers: {{ 'Content-Type': 'multipart/form-data' }}, timeout: 120000 }});",
             "}",
             "",
             f"void {entity_snake};",  # placeholder to avoid unused var warning; removed below
@@ -467,6 +470,7 @@ def gen_view_index(
     *,
     search_field_names: list[str] | None = None,
     button_auth: bool = False,
+    export_parent_fields: list[str] | None = None,
 ) -> str:
     """生成 views/<module>/<entity>/index.vue"""
     entity = model.name
@@ -626,6 +630,16 @@ def gen_view_index(
         />"""
 
     excel_auth = f":can-import=\"hasAuth('{_button_code(module, model, 'IMPORT')}')\" :can-export=\"hasAuth('{_button_code(module, model, 'EXPORT')}')\"" if button_auth else ""
+    export_api = f"() => fetchExport{entity}(searchParams)"
+    export_selected_api = f"ids => fetchExport{entity}({{ ...searchParams, ids }})"
+    export_field_options = ""
+    if export_parent_fields is not None:
+        export_api = f"parentFields => fetchExport{entity}({{ ...searchParams, parentFields }})"
+        export_selected_api = f"(ids, parentFields) => fetchExport{entity}({{ ...searchParams, ids, parentFields }})"
+        labels = {field.name: snake_to_camel(field.name) for field in fields}
+        labels.update({f"{relation.name}_id": relation_label_key(relation) for relation in fk_relations})
+        options = ", ".join(f"{{ name: '{name}', label: $t('{i18n_page}.{labels[name]}') }}" for name in export_parent_fields)
+        export_field_options = f':export-parent-fields="[{options}]"'
 
     template = f"""<script setup lang="tsx">
 import {{ {", ".join(vue_imports)} }} from 'vue';
@@ -712,8 +726,9 @@ function edit(id: string) {{
           <ExcelTransfer
             :import-api="fetchImport{entity}"
             :preview-api="fetchPreviewImport{entity}"
-            :export-api="() => fetchExport{entity}(searchParams)"
-            :export-selected-api="ids => fetchExport{entity}({{ ...searchParams, ids }})"
+            :export-api="{export_api}"
+            :export-selected-api="{export_selected_api}"
+            {export_field_options}
             :selected-ids="checkedRowKeys"
             :template-api="fetch{entity}ImportTemplate"
             {excel_auth}
@@ -1338,12 +1353,14 @@ def generate_web(
     list_fields_map: dict[str, list[str]],
     search_fields_map: dict[str, list[str]],
     button_auth_models: set[str] | None = None,
+    backend_options: BackendFeatureOptions | None = None,
     force: bool = False,
     dry_run: bool = False,
 ) -> list[tuple[str, str]]:
     """生成前端所有文件，返回 [(相对路径, 状态)] 列表。"""
     results: list[tuple[str, str]] = []
     button_auth_models = button_auth_models or set()
+    backend_options = backend_options or BackendFeatureOptions()
 
     def write(path: Path, content: str) -> None:
         rel = path.relative_to(web_root).as_posix()
@@ -1387,6 +1404,7 @@ def generate_web(
                 list_fields,
                 search_field_names=search_fields,
                 button_auth=model.name in button_auth_models,
+                export_parent_fields=excel_field_names(model, backend_options) if export_children(module, model, models, backend_options) else None,
             ),
         )
         write(view_dir / "modules" / f"{entity_kebab}-search.vue", gen_view_search(module, model, search_fields))
