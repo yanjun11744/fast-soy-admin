@@ -1,5 +1,7 @@
 const local: App.I18n.BaseSchema = {
   imageTools: {
+    dropHint: 'Click to upload or drop images here, including downloaded image files from WeChat or WeCom chats.',
+    dropUnavailable: 'No image file was available. Download the chat image first, or save it locally and upload it.',
     thumbnail: 'Thumbnail',
     name: 'File name',
     format: 'Format',

@@ -328,6 +328,8 @@ declare namespace App {
 
     type Schema = {
       imageTools: {
+        dropHint: string;
+        dropUnavailable: string;
         thumbnail: string;
         name: string;
         format: string;

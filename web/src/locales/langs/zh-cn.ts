@@ -1,5 +1,7 @@
 const local: App.I18n.BaseSchema = {
   imageTools: {
+    dropHint: '点击上传，或将图片拖到此区域；支持从微信、企业微信聊天拖入已下载的图片文件。',
+    dropUnavailable: '未读取到图片文件，请先在聊天中下载图片再拖入，或保存到本地后上传。',
     thumbnail: '缩略图',
     name: '文件名称',
     format: '图片格式',
