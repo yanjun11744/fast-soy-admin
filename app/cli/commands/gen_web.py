@@ -8,7 +8,7 @@ import click
 
 from app.cli.display import echo_file_result, echo_lines, format_path, has_written_files, relative_path, run_just_format
 from app.cli.git_tools import ensure_committed_worktree
-from app.cli.options import all_choice_names, resolve_field_map
+from app.cli.options import BackendFeatureOptions, all_choice_names, resolve_field_map, resolve_text_field_map
 from app.cli.parser import parse_models
 from app.cli.prompts import (
     default_frontend_list_field_names,
@@ -70,6 +70,7 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"], "max_content_width": 
 @click.option("-y", "--yes", "assume_yes", is_flag=True, help="不进入交互，使用全模型与默认字段")
 @click.option("--list-fields", "list_field_specs", multiple=True, help="前端列表字段，例: Product:name,warehouse_id,status_type")
 @click.option("--search-fields", "search_field_specs", multiple=True, help="前端搜索字段，例: Product:name,status_type")
+@click.option("--exclude-fields", "exclude_field_specs", multiple=True, help="与后端一致的导出排除字段，例: Product:secret")
 @click.option("--button-auth", is_flag=True, help="生成前端按钮权限显示控制（需后端已声明同名按钮权限）")
 @click.option("--force", is_flag=True, help="强制覆盖已存在的文件")
 @click.option("--dry-run", is_flag=True, help="只预览将创建/覆盖/追加的文件，不写入磁盘")
@@ -81,6 +82,7 @@ def gen_web(
     assume_yes: bool,
     list_field_specs: tuple[str, ...],
     search_field_specs: tuple[str, ...],
+    exclude_field_specs: tuple[str, ...],
     button_auth: bool,
     force: bool,
     dry_run: bool,
@@ -173,6 +175,7 @@ def gen_web(
         list_fields_map=list_fields,
         search_fields_map=search_fields,
         button_auth_models={model.name for model in models} if button_auth else set(),
+        backend_options=BackendFeatureOptions(exclude_fields=resolve_text_field_map(models, exclude_field_specs, option_name="--exclude-fields")),
         force=force,
         dry_run=dry_run,
     )

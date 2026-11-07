@@ -328,6 +328,8 @@ declare namespace App {
 
     type Schema = {
       imageTools: {
+        dropHint: string;
+        dropUnavailable: string;
         thumbnail: string;
         name: string;
         format: string;
@@ -383,6 +385,9 @@ declare namespace App {
         excelExport: string;
         excelExportFiltered: string;
         excelExportSelected: string;
+        excelDetailExport: string;
+        excelParentFields: string;
+        excelParentFieldsHint: string;
         excelTemplate: string;
         excelFileLimit: string;
         excelImportSuccess: string;

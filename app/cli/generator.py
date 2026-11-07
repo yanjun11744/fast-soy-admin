@@ -7,6 +7,7 @@ from pprint import pformat
 
 from app.cli.options import BackendFeatureOptions
 from app.cli.parser import DATE_RANGE_FIELD_TYPES, FieldInfo, ModelInfo, RelationInfo, collect_extra_imports
+from app.cli.relations import excel_field_names, export_children
 
 # Tortoise 整型字段 → 约束类型别名（来自 app.utils.types）
 INT_FIELD_CONSTRAINT: dict[str, str] = {
@@ -366,6 +367,8 @@ def gen_api_manage(
         fastapi_imports.append("Request")
 
     utils_imports = ["CRUDRouter", "ExcelConfig"]
+    if any(export_children(module_name, model, models, backend_options) for model in models):
+        utils_imports.append("ExcelDetail")
     if needs_search_config:
         utils_imports.append("SearchFieldConfig")
     if needs_request:
@@ -440,10 +443,23 @@ def gen_api_manage(
         lines.append(f"    controller={m.snake_name}_controller,")
         lines.append(f"    create_schema={m.name}Create,")
         excluded = set(backend_options.exclude_fields.get(m.name, []))
-        excel_fields = [f.name for f in m.schema_fields if f.name not in excluded]
-        excel_fields.extend(f"{r.name}_id" for r in m.relations if r.relation_type in ("ForeignKeyField", "OneToOneField") and f"{r.name}_id" not in excluded)
+        excel_fields = excel_field_names(m, backend_options)
         if excel_fields:
-            lines.append(f"    excel=ExcelConfig(fields={tuple(excel_fields)!r}),")
+            routes = backend_options.enable_routes.get(m.name)
+            update_enabled = routes is None or "update" in routes
+            unique_fields = [f.name for f in m.schema_fields if f.unique and f.required and f.name in excel_fields]
+            update_key = unique_fields[0] if len(unique_fields) == 1 else "id"
+            update_option = f", update_key={update_key!r}" if update_enabled and (update_key != "id" or "id" not in excluded) else ""
+            details = export_children(module_name, m, models, backend_options)
+            if details:
+                lines.append(f"    excel=ExcelConfig(fields={tuple(excel_fields)!r}{update_option}, details=(")
+                for index, (child, relation) in enumerate(details, start=1):
+                    # Resource references resolve at export time, after all CRUD declarations exist.
+                    title = "".join("_" if char in r"\/*?:[]" else char for char in child.cn_name)[:24] + f"_{index}"
+                    lines.append(f"        ExcelDetail(sheet_name={title!r}, resource=lambda: {child.snake_name}_crud, parent_field={f'{relation.name}_id'!r}),")
+                lines.append("    )),")
+            else:
+                lines.append(f"    excel=ExcelConfig(fields={tuple(excel_fields)!r}{update_option}),")
             if scope:
                 lines.append(f"    excel_scope_filter=_{m.snake_name}_excel_scope,")
 

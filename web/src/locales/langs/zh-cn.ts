@@ -1,5 +1,7 @@
 const local: App.I18n.BaseSchema = {
   imageTools: {
+    dropHint: '点击上传，或将图片拖到此区域；支持从微信、企业微信聊天拖入已下载的图片文件。',
+    dropUnavailable: '未读取到图片文件，请先在聊天中下载图片再拖入，或保存到本地后上传。',
     thumbnail: '缩略图',
     name: '文件名称',
     format: '图片格式',
@@ -58,9 +60,12 @@ const local: App.I18n.BaseSchema = {
     excelExport: '导出 Excel',
     excelExportFiltered: '导出筛选结果',
     excelExportSelected: '导出所选（{count} 条）',
+    excelDetailExport: '导出父子表',
+    excelParentFields: '随子表明细导出的父表字段',
+    excelParentFieldsHint: '导出文件包含父表和对应子表。可选择随每条子表明细附带的父表字段，也可全部取消。',
     excelTemplate: '下载导入模板',
     excelFileLimit: '仅支持 5MB 以内的 .xlsx 文件',
-    excelImportSuccess: '成功导入 {count} 条数据',
+    excelImportSuccess: '新增成功 {created} 条，更新成功 {updated} 条',
     action: '操作',
     add: '新增',
     addSuccess: '添加成功',

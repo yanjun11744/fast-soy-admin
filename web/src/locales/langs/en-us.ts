@@ -1,5 +1,7 @@
 const local: App.I18n.BaseSchema = {
   imageTools: {
+    dropHint: 'Click to upload or drop images here, including downloaded image files from WeChat or WeCom chats.',
+    dropUnavailable: 'No image file was available. Download the chat image first, or save it locally and upload it.',
     thumbnail: 'Thumbnail',
     name: 'File name',
     format: 'Format',
@@ -58,9 +60,13 @@ const local: App.I18n.BaseSchema = {
     excelExport: 'Export Excel',
     excelExportFiltered: 'Export filtered results',
     excelExportSelected: 'Export selected ({count})',
+    excelDetailExport: 'Export parent and details',
+    excelParentFields: 'Parent fields included with each detail',
+    excelParentFieldsHint:
+      'The workbook includes the parent and its detail sheets. Select the parent fields to repeat on each detail row, or clear all.',
     excelTemplate: 'Download import template',
     excelFileLimit: 'Upload an .xlsx file no larger than 5MB',
-    excelImportSuccess: 'Imported {count} records',
+    excelImportSuccess: 'Created {created} records, updated {updated} records',
     action: 'Action',
     add: 'Add',
     addSuccess: 'Add Success',

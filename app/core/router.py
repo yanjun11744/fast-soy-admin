@@ -1,6 +1,6 @@
 from base64 import b64encode
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from fastapi import APIRouter, Form, Request, UploadFile
@@ -14,7 +14,8 @@ from tortoise.transactions import in_transaction
 from app.core.base_schema import CommonIds, Success, SuccessExtra
 from app.core.code import Code
 from app.core.crud import CRUDBase, get_db_conn
-from app.core.excel import MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, ExcelImportOptions, ExcelImportResult, parse_excel, write_excel
+from app.core.excel import MAX_COLUMNS, MAX_FILE_BYTES, MAX_ROWS, ExcelConfig, ExcelImportOptions, ExcelImportResult, parse_excel, write_excel, write_excel_sheets
+from app.core.excel_export import detail_sheets, export_record
 from app.core.exceptions import BizError
 from app.core.sqids import encode_id
 from app.core.types import SqidId, SqidPath
@@ -452,15 +453,33 @@ class CRUDRouter:
         schema = self.create_schema
         if not config or not schema:
             raise ValueError("Excel requires a create_schema and explicit fields")
+        create_schema = schema
         if not config.fields or not set(config.fields) <= set(schema.model_fields):
             raise ValueError("Excel fields must be nonempty create_schema field names")
         if set(config.fields) & set(self.exclude_fields):
             raise ValueError("Excel fields cannot include excluded fields")
+        controller = self.controller
+        update_schema = self.update_schema
+        if config.update_key is not None:
+            if "update" not in self.enable_routes or update_schema is None:
+                raise ValueError("Excel update_key requires an enabled update route and update_schema")
+            if not set(config.fields) <= update_schema.model_fields.keys():
+                raise ValueError("Excel update fields must belong to update_schema")
+            if config.update_key == "id":
+                if "id" in self.exclude_fields or controller.model._meta.pk_attr != "id":
+                    raise ValueError("Excel ID updates require an exposed id primary key")
+                schema = create_model(f"{schema.__name__}Excel", __base__=schema, id=(SqidId | None, Field(default=None, title="ID")))
+                config = replace(config, fields=("id", *config.fields))
+            else:
+                key_field = controller.model._meta.fields_map.get(config.update_key)
+                if config.update_key not in config.fields or not schema.model_fields[config.update_key].is_required():
+                    raise ValueError("Excel update_key must be a required configured field")
+                if key_field is None or not key_field.unique or key_field.null or key_field.pk:
+                    raise ValueError("Excel update_key must be a unique non-null business field")
         for action, fallback in (("import", "create"), ("import_template", "import"), ("import_preview", "import"), ("export", "list")):
             if action not in self.action_dependencies:
                 self.action_dependencies[action] = self.action_dependencies.get(fallback, [])
         headers, _ = config.resolve(schema)
-        controller = self.controller
 
         async def download_template() -> Success:
             content = await run_in_threadpool(write_excel, headers, [])
@@ -485,17 +504,42 @@ class CRUDRouter:
             result = await parse_upload(file, options)
             return Success(data=result.preview.model_dump(mode="json", by_alias=True))
 
-        async def import_excel(file: UploadFile, options: str | None = Form(None)) -> Success:
+        async def import_excel(request: Request, file: UploadFile, options: str | None = Form(None)) -> Success:
             result = await parse_upload(file, options)
             if result.preview.errors:
                 raise BizError(Code.REQUEST_VALIDATION, result.preview.errors[0])
+            created_count = updated_count = 0
+            scope = await self.excel_scope_filter(request) if config.update_key and self.excel_scope_filter else Q()
+            if config.update_key and self.data_policy:
+                from app.core.policy import apply_data_policy
+
+                module = self.route_key_prefix.split(".", 1)[0] if self.route_key_prefix else None
+                scope &= await apply_data_policy(self.data_policy, module=module)
             async with in_transaction(get_db_conn(controller.model)):
                 for row_number, item in result.rows:
                     try:
-                        await controller.create(obj_in=item)
+                        key = getattr(item, config.update_key) if config.update_key else None
+                        existing = await controller.get_or_none(**{config.update_key: key}) if config.update_key and key is not None else None
+                        if existing is not None and update_schema is not None:
+                            if not await controller.model.filter(scope, pk=existing.pk).exists():
+                                raise BizError(Code.REQUEST_VALIDATION, f"第 {row_number} 行记录不存在或不允许更新，导入已全部回滚")
+                            values = item.model_dump(mode="json", exclude_unset=True, exclude_none=True, exclude={"id"})
+                            update = update_schema.model_validate(values)
+                            await controller.update(id=existing.pk, obj_in=update)
+                            updated_count += 1
+                        elif config.update_key == "id" and key is not None:
+                            raise BizError(Code.REQUEST_VALIDATION, f"第 {row_number} 行记录不存在或不允许更新，导入已全部回滚")
+                        else:
+                            values = item.model_dump(exclude_unset=True, exclude_none=True, exclude={"id"})
+                            # The derived ID schema already validated business fields; do not decode Sqid FKs twice.
+                            created = create_schema.model_construct(**values) if config.update_key == "id" else item
+                            await controller.create(obj_in=created)
+                            created_count += 1
+                    except ValidationError as exc:
+                        raise BizError(Code.REQUEST_VALIDATION, f"第 {row_number} 行更新字段校验失败，导入已全部回滚") from exc
                     except IntegrityError as exc:
                         raise BizError(Code.DUPLICATE_RESOURCE, f"第 {row_number} 行违反唯一键或外键约束，导入已全部回滚") from exc
-            return Success(msg="导入成功", data={"importedCount": len(result.rows)})
+            return Success(msg="导入成功", data={"importedCount": len(result.rows), "createdCount": created_count, "updatedCount": updated_count})
 
         # Import remains coupled to create availability; export to list availability.
         if "create" in self.enable_routes:
@@ -508,6 +552,7 @@ class CRUDRouter:
             f"{self.list_schema.__name__}Export",
             __base__=self.list_schema,
             ids=(list[SqidId] | None, Field(default=None, min_length=1, max_length=MAX_ROWS, title="所选记录 ID")),
+            parent_fields=(list[str] | None, Field(default=None, max_length=MAX_COLUMNS, title="子表附带的父表字段")),
         )
 
         async def export_excel(obj_in: export_schema, request: Request) -> Success:  # type: ignore[valid-type]
@@ -526,17 +571,11 @@ class CRUDRouter:
             total, objects = await controller.list(page=1, page_size=MAX_ROWS + 1, search=q, order=order)
             if total > MAX_ROWS or len(objects) > MAX_ROWS:
                 raise BizError(Code.REQUEST_VALIDATION, f"导出最多 {MAX_ROWS} 行，请缩小筛选范围")
-            records = []
-            for obj in objects:
-                if self.record_transform:
-                    record = await self._to_record(obj)
-                    records.append([record.get(schema.model_fields[name].alias or name) for name in config.fields])
-                else:
-                    # Schema serializers preserve Sqid FK IDs, decimals and ISO dates.
-                    values = {name: getattr(obj, name) for name in config.fields}
-                    record = schema.model_construct(**values).model_dump(mode="json", include=set(config.fields))
-                    records.append([record.get(name) for name in config.fields])
-            content = await run_in_threadpool(write_excel, headers, records)
+            records = [await export_record(self, schema, config, obj) for obj in objects]
+            sheets = [("Data", headers, records)]
+            if config.details:
+                sheets.extend(await detail_sheets(self, config, headers, objects, records, obj_in.parent_fields, request))
+            content = await run_in_threadpool(write_excel_sheets, sheets)
             return Success(data={"filename": f"{self._resource}.xlsx", "content": b64encode(content).decode()})
 
         self._register_spec("export", f"/{self._resource}/export", {"POST"}, f"导出{self.summary_prefix}", export_excel)

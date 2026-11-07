@@ -15,7 +15,7 @@ const sources = computed(() => imageUrls(props.value).map(imageSrc).filter(Boole
 
 <template>
   <NImageGroup>
-    <NSpace v-if="sources.length" :size="8" align="center">
+    <NSpace v-if="sources.length" :size="8" align="center" justify="center" class="w-full">
       <NImage
         v-for="(src, index) in sources"
         :key="`${index}-${src}`"

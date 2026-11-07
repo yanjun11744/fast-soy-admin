@@ -2,6 +2,7 @@ import { defineComponent } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UploadCustomRequestOptions, UploadFileInfo } from 'naive-ui';
+import { NButton, NSpace, NUpload } from 'naive-ui';
 import { fetchUploadImage, fetchUploadOptions } from '@/service/api/upload';
 import ImageUpload from '../image-upload.vue';
 
@@ -70,6 +71,66 @@ beforeEach(() => {
 });
 
 describe('image upload model lifecycle', () => {
+  it('renders stored extensionless image URLs after reopening with the real upload control', async () => {
+    const value = ['/system-manage/uploads/content/0123456789abcdef0123456789abcdef'];
+    for (let reopen = 0; reopen < 2; reopen++) {
+      const wrapper = mount(ImageUpload, {
+        props: { value, valueType: 'array' },
+        global: { components: { NUpload, NSpace, NButton } }
+      });
+      await flushPromises();
+      expect(wrapper.find('img').attributes('src')).toBe(`http://api.test${value[0]}`);
+      expect(fetchUploadImage).not.toHaveBeenCalled();
+      wrapper.unmount();
+    }
+  });
+
+  it.each(['files', 'items'])('uploads chat drag files without filesystem entries using %s', async source => {
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+    vi.mocked(fetchUploadImage).mockResolvedValue({ data: { url: '/uploaded' }, error: null } as any);
+    const wrapper = mount(ImageUpload, {
+      props: { value: [], valueType: 'array' },
+      global: { components: { NUpload, NSpace, NButton } }
+    });
+    try {
+      await flushPromises();
+      const raw = new File(['image'], 'chat-image', { type: 'image/png' });
+      await wrapper.trigger('drop', {
+        dataTransfer: {
+          files: source === 'files' ? [raw] : [],
+          items: [{ kind: 'file', getAsFile: () => raw }]
+        }
+      });
+      await flushPromises();
+      expect(fetchUploadImage).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(fetchUploadImage).mock.calls[0][0].name).toBe('chat-image.png');
+      expect(wrapper.emitted('update:value')?.at(-1)).toEqual([['/uploaded']]);
+      expect(wrapper.emitted('update:busy')?.at(-1)).toEqual([false]);
+    } finally {
+      wrapper.unmount();
+      createUrl.mockRestore();
+    }
+  });
+
+  it('does not fetch chat links and respects disabled and full upload fields', async () => {
+    const warning = vi.fn();
+    window.$message = { warning, error: vi.fn() } as never;
+    const { wrapper } = setup(['/existing']);
+    await wrapper.setProps({ limit: 1 });
+    await flushPromises();
+    const transfer = { files: [new File(['image'], 'chat.png', { type: 'image/png' })] };
+    await wrapper.trigger('drop', { dataTransfer: transfer });
+    expect(warning).toHaveBeenCalledWith('imageTools.limit');
+    expect(fetchUploadImage).not.toHaveBeenCalled();
+    await wrapper.setProps({ disabled: true });
+    await wrapper.trigger('drop', { dataTransfer: transfer });
+    expect(wrapper.props('value')).toEqual(['/existing']);
+    await wrapper.setProps({ disabled: false });
+    await wrapper.trigger('drop', { dataTransfer: { files: [], items: [{ kind: 'string' }] } });
+    expect(warning).toHaveBeenCalledWith('imageTools.dropUnavailable');
+    wrapper.unmount();
+  });
+
   it('preserves selection order when concurrent uploads finish out of order', async () => {
     const first = deferred();
     const second = deferred();
