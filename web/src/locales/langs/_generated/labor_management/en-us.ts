@@ -4,9 +4,9 @@
 export default {
   route: {
     'labor-management': 'LaborManagement',
-    'labor-management_labor-project': 'Labor Project',
+    'labor-management_labor-project': 'Received Workpieces',
     'labor-management_labor-worker': 'Labor Worker',
-    'labor-management_labor-work-hour': 'Labor Work Hour'
+    'labor-management_labor-work-hour': 'Ticket Hours'
   },
   page: {
     labor_management: {
@@ -28,12 +28,12 @@ export default {
         skipPainting: 'No painting required',
         orderCount: 'Orders',
         ticketCodeRequired: 'Enter a ticket code of at most 100 characters',
-        createWorkHourFailed: 'Could not create the ticket. Please try again.',
+        createWorkHourFailed: 'Could not create ticket hours. Please try again.',
         workHoursRequired: 'Enter work hours of zero or more',
         matchedWorkHours: 'Ticket work hours',
-        noMatchedWorkHours: 'No tickets match this order',
+        noMatchedWorkHours: 'No ticket hours match this order',
         workHoursLoadFailed: 'Could not load ticket work hours. Please try again.',
-        matchedOrders: 'Related orders',
+        matchedOrders: 'Received workpiece details',
         noMatchedOrders: 'No matching orders',
         ordersLoadFailed: 'Could not load orders. Please try again.',
         retryOrders: 'Reload',
@@ -41,11 +41,11 @@ export default {
         copied: 'Copied',
         copyFailed: 'Copy failed. Check browser clipboard permissions.',
         ticketDropHint: 'Drag a ticket image here to recognize it',
-        pageTitle: 'Labor Project',
+        pageTitle: 'Received Workpieces',
         partNo: 'Project number',
         form: { partNo: 'Please enter a project number' },
-        addLaborProject: 'Add Labor Project',
-        editLaborProject: 'Edit Labor Project'
+        addLaborProject: 'Add Received Workpiece',
+        editLaborProject: 'Edit Received Workpiece'
       },
       labor_worker: {
         pageTitle: 'Labor Worker',
@@ -53,6 +53,7 @@ export default {
         trade: 'trade',
         name: 'name',
         remark: 'remark',
+        importIdHint: 'IDs are generated for new imports. To update records, use an export file that includes IDs.',
         form: {
           employeeNo: 'Please input employeeNo',
           trade: 'Please input trade',
@@ -71,7 +72,7 @@ export default {
         ocrUpload: 'Select an image to recognize the ticket code',
         ocrSelect: 'Select recognized text and check the ticket code',
         ocrEmpty: 'No text recognized. Enter the code manually.',
-        pageTitle: 'Labor Work Hour',
+        pageTitle: 'Ticket Hours',
         ticketCode: 'ticketCode',
         workHours: 'workHours',
         orderNo: 'orderNo',
@@ -82,8 +83,8 @@ export default {
           orderNo: 'Please input orderNo',
           worker: 'Please select worker'
         },
-        addLaborWorkHour: 'Add Labor Work Hour',
-        editLaborWorkHour: 'Edit Labor Work Hour'
+        addLaborWorkHour: 'Add Ticket Hours',
+        editLaborWorkHour: 'Edit Ticket Hours'
       }
     }
   }

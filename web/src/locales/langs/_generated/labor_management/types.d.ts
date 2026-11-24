@@ -50,6 +50,7 @@ declare global {
           trade: string;
           name: string;
           remark: string;
+          importIdHint: string;
           form: {
             employeeNo: string;
             trade: string;

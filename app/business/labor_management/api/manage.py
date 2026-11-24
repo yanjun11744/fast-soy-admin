@@ -2,6 +2,7 @@
 labor_management 管理接口 — CRUD。
 """
 
+from base64 import b64encode
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, Form, UploadFile
@@ -21,7 +22,19 @@ from app.business.labor_management.schemas import (
     LaborWorkHourUpdate,
 )
 from app.business.labor_management.services import import_labor_projects
-from app.utils import BizError, Code, CRUDRouter, ExcelConfig, ExcelDetail, ExcelImportOptions, SearchFieldConfig, Success, parse_excel, require_buttons
+from app.utils import (
+    BizError,
+    Code,
+    CRUDRouter,
+    ExcelConfig,
+    ExcelDetail,
+    ExcelImportOptions,
+    SearchFieldConfig,
+    Success,
+    parse_excel,
+    require_buttons,
+    write_excel,
+)
 
 labor_project_crud = CRUDRouter(
     prefix="/labor_projects",
@@ -89,6 +102,16 @@ labor_worker_crud = CRUDRouter(
     },
     summary_prefix="劳务人员",
 )
+
+
+@labor_worker_crud.override("import_template")
+async def download_labor_worker_template() -> Success:
+    """新增人员由数据库生成 ID，模板不要求手动填写。"""
+    config = ExcelConfig(fields=("employee_no", "trade", "name", "remark"))
+    headers, _ = config.resolve(LaborWorkerCreate)
+    content = await run_in_threadpool(write_excel, headers, [])
+    return Success(data={"filename": "labor_workers-template.xlsx", "content": b64encode(content).decode()})
+
 
 labor_work_hour_crud = CRUDRouter(
     prefix="/labor_work_hours",

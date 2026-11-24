@@ -5,9 +5,9 @@
 export default {
   route: {
     'labor-management': '劳务管理',
-    'labor-management_labor-project': '劳务项目',
+    'labor-management_labor-project': '接收工件',
     'labor-management_labor-worker': '劳务人员',
-    'labor-management_labor-work-hour': '工票对应的工时'
+    'labor-management_labor-work-hour': '工票工时'
   },
   page: {
     labor_management: {
@@ -28,12 +28,12 @@ export default {
         skipPainting: '无需刷漆',
         orderCount: '订单数量',
         ticketCodeRequired: '请输入不超过 100 个字符的工票码',
-        createWorkHourFailed: '工票创建失败，请重试',
+        createWorkHourFailed: '工票工时创建失败，请重试',
         workHoursRequired: '请输入不小于零的工时',
         matchedWorkHours: '工票工时',
-        noMatchedWorkHours: '该订单暂无匹配工票',
+        noMatchedWorkHours: '该订单暂无匹配工票工时',
         workHoursLoadFailed: '工票工时加载失败，请重试',
-        matchedOrders: '关联订单',
+        matchedOrders: '接收工件明细',
         noMatchedOrders: '暂无匹配订单',
         ordersLoadFailed: '订单加载失败，请重试',
         retryOrders: '重新加载',
@@ -41,11 +41,11 @@ export default {
         copied: '已复制',
         copyFailed: '复制失败，请检查浏览器剪贴板权限',
         ticketDropHint: '可直接拖动工票图片到此处识别',
-        pageTitle: '劳务项目',
+        pageTitle: '接收工件',
         partNo: '项目号',
         form: { partNo: '请输入项目号' },
-        addLaborProject: '新增劳务项目',
-        editLaborProject: '编辑劳务项目'
+        addLaborProject: '新增接收工件',
+        editLaborProject: '编辑接收工件'
       },
       labor_worker: {
         pageTitle: '劳务人员',
@@ -53,6 +53,7 @@ export default {
         trade: '工种',
         name: '姓名',
         remark: '备注',
+        importIdHint: '新增导入时 ID 由系统自动生成，无需填写；更新请使用包含 ID 的导出文件。',
         form: {
           employeeNo: '请输入工号',
           trade: '请输入工种',
@@ -71,7 +72,7 @@ export default {
         ocrUpload: '选择图片识别工票码',
         ocrSelect: '选择识别文字并核对工票码',
         ocrEmpty: '未识别到文字，请手动输入',
-        pageTitle: '工票对应的工时',
+        pageTitle: '工票工时',
         ticketCode: '工票码',
         workHours: '工时（小时）',
         orderNo: '订单号',
@@ -82,8 +83,8 @@ export default {
           orderNo: '请输入订单号',
           worker: '请选择劳务人员'
         },
-        addLaborWorkHour: '新增工票对应的工时',
-        editLaborWorkHour: '编辑工票对应的工时'
+        addLaborWorkHour: '新增工票工时',
+        editLaborWorkHour: '编辑工票工时'
       }
     }
   }

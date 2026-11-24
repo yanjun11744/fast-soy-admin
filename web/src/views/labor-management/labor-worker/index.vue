@@ -109,6 +109,7 @@ function edit(id: string) {
     >
       <template #header-extra>
         <NSpace align="center" wrap>
+          <span class="text-12px text-gray-500">{{ $t('page.labor_management.labor_worker.importIdHint') }}</span>
           <ExcelTransfer
             :import-api="fetchImportLaborWorker"
             :preview-api="fetchPreviewImportLaborWorker"

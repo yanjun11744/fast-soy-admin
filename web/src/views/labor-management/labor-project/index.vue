@@ -338,8 +338,14 @@ function edit(id: string) {
 
 .labor-project-table :deep(.labor-project-detail) {
   margin-block: 12px;
-  margin-inline: clamp(12px, 2.5vw, 32px) 12px;
+  margin-inline: clamp(12px, 2.5vw, 24px) 12px;
   border-inline-start: 2px solid var(--n-merged-border-color);
+  padding-inline-start: 12px;
+}
+
+.labor-project-table :deep(.labor-order-work-hours-detail) {
+  margin-inline-start: clamp(12px, 2vw, 20px);
+  border-inline-start: 1px solid var(--n-merged-border-color);
   padding-inline-start: 12px;
 }
 

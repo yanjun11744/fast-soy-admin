@@ -175,7 +175,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="labor-project-detail">
+  <div class="labor-order-work-hours-detail">
     <h3 class="labor-project-detail-heading">
       {{ $t('page.labor_management.labor_project.matchedWorkHours') }}
       <span v-if="records.length" class="labor-project-detail-count">{{ records.length }}</span>

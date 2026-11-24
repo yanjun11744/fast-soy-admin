@@ -54,10 +54,13 @@ const columns = computed<DataTableColumns<Api.OrderManagementManage.Order>>(() =
         )
       ])
   },
-  { key: 'name', title: $t('page.order_management.order.name'), minWidth: 150 },
-  { key: 'quantity', title: $t('page.order_management.order.quantity'), minWidth: 90 },
-  { key: 'receivedQuantity', title: $t('page.order_management.order.receivedQuantity'), minWidth: 100 },
-  { key: 'unit', title: $t('page.order_management.order.unit'), minWidth: 80 },
+  { key: 'name', title: $t('page.order_management.order.name'), minWidth: 180 },
+  {
+    key: 'receivedQuantity',
+    title: `${$t('page.order_management.order.receivedQuantity')} / ${$t('page.order_management.order.quantity')}`,
+    minWidth: 160,
+    render: row => `${row.receivedQuantity ?? '—'} / ${row.quantity ?? '—'}${row.unit ? ` ${row.unit}` : ''}`
+  },
   { key: 'orderDueDate', title: $t('page.order_management.order.orderDueDate'), minWidth: 120 }
 ]);
 
