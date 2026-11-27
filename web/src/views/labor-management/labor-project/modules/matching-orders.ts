@@ -1,4 +1,4 @@
-import { fetchGetLaborWorkHourList, fetchGetOrderList } from '@/service/api';
+import { fetchGetLaborProjectList, fetchGetLaborWorkHourList, fetchGetOrderList } from '@/service/api';
 
 export function summarizeOrders(orders: Api.OrderManagementManage.Order[]) {
   const summarizeField = (values: (string | null | undefined)[]) => {
@@ -53,6 +53,73 @@ export async function fetchMatchingOrders(
 ): Promise<Api.OrderManagementManage.Order[] | null> {
   const grouped = await fetchMatchingOrdersForProjects([partNo], isCurrent);
   return grouped === null ? null : (grouped.get(partNo) ?? []);
+}
+
+/** Load every project imported inside the given range, following all pages. */
+export async function fetchLaborProjectsForImportRange(
+  range: { importedAtStart: string | null; importedAtEnd: string | null },
+  isCurrent: () => boolean
+): Promise<Api.LaborManagementManage.LaborProject[] | null> {
+  const records: Api.LaborManagementManage.LaborProject[] = [];
+  const rangeStart = range.importedAtStart ? Date.parse(range.importedAtStart) : null;
+  const rangeEnd = range.importedAtEnd ? Date.parse(range.importedAtEnd) : null;
+  let page = 1;
+  let total = 0;
+  do {
+    const { data, error } = await fetchGetLaborProjectList({
+      current: page,
+      size: 1000,
+      importedAtStart: range.importedAtStart,
+      importedAtEnd: range.importedAtEnd
+    });
+    if (!isCurrent()) return null;
+    if (error || !data) throw new Error('Project lookup failed');
+    for (const project of data.records) {
+      if (
+        (rangeStart !== null && (project.importedAt == null || project.importedAt < rangeStart)) ||
+        (rangeEnd !== null && (project.importedAt == null || project.importedAt > rangeEnd))
+      ) {
+        throw new Error('Project lookup did not apply the exact import range');
+      }
+    }
+    records.push(...data.records);
+    total = data.total;
+    if (!data.records.length && records.length < total) throw new Error('Incomplete project lookup');
+    if (!data.records.length) break;
+    page += 1;
+  } while (records.length < total);
+  return records;
+}
+
+/** Load every ticket for the requested orders, batching exact order-number searches. */
+export async function fetchTicketsForOrders(
+  orderNos: string[],
+  isCurrent: () => boolean
+): Promise<Map<string, Api.LaborManagementManage.LaborWorkHour[]> | null> {
+  const unique = [...new Set(orderNos)];
+  const grouped = new Map(unique.map(orderNo => [orderNo, [] as Api.LaborManagementManage.LaborWorkHour[]]));
+  for (let offset = 0; offset < unique.length; offset += 100) {
+    const batch = unique.slice(offset, offset + 100);
+    const allowed = new Set(batch);
+    let page = 1;
+    let received = 0;
+    let total = 0;
+    do {
+      const { data, error } = await fetchGetLaborWorkHourList({ current: page, size: 1000, orderNos: batch });
+      if (!isCurrent()) return null;
+      if (error || !data) throw new Error('Ticket lookup failed');
+      for (const ticket of data.records) {
+        if (!allowed.has(ticket.orderNo)) throw new Error('Ticket lookup did not apply the exact order filter');
+        grouped.get(ticket.orderNo)?.push(ticket);
+      }
+      received += data.records.length;
+      total = data.total;
+      if (!data.records.length && received < total) throw new Error('Incomplete ticket lookup');
+      if (!data.records.length) break;
+      page += 1;
+    } while (received < total);
+  }
+  return grouped;
 }
 
 /** Fail closed if either orders or tickets cannot be checked. */
